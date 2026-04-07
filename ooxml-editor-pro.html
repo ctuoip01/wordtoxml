@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OOXML Word 编辑器 Pro</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closetag.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/xml-hint.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+<style>
+:root {
+  --bg-primary: #1a1b26;
+  --bg-secondary: #24283b;
+  --bg-tertiary: #2f3348;
+  --text-primary: #c0caf5;
+  --text-secondary: #a9b1d6;
+  --text-muted: #565f89;
+  --accent-blue: #7aa2f7;
+  --accent-green: #9ece6a;
+  --accent-orange: #e0af68;
+  --accent-red: #f7768e;
+  --accent-purple: #bb9af7;
+  --accent-cyan: #7dcfff;
+  --border-color: #3b4261;
+  --shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Header ===== */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 52px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  gap: 12px;
+}
+.header-left { display:flex; align-items:center; gap:12px; min-width:0; }
+.logo { display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--accent-blue); flex-shrink:0; }
+.logo svg { width:22px; height:22px; }
+.file-name { font-size:12px; color:var(--text-secondary); padding:3px 10px; background:var(--bg-tertiary); border-radius:4px; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Mode tabs in header */
+.mode-tabs { display:flex; align-items:center; gap:2px; background:var(--bg-tertiary); border-radius:6px; padding:3px; }
+.mode-tab {
+  padding:4px 12px; border-radius:4px; font-size:12px; font-weight:500;
+  color:var(--text-muted); cursor:pointer; border:none; background:transparent;
+  transition:all 0.15s; white-space:nowrap; display:flex; align-items:center; gap:5px;
+}
+.mode-tab:hover { color:var(--text-primary); background:var(--border-color); }
+.mode-tab.active { background:var(--accent-blue); color:#1a1b26; font-weight:600; }
+.mode-tab svg { width:13px; height:13px; }
+
+.header-actions { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.btn {
+  display:inline-flex; align-items:center; gap:5px; padding:5px 12px;
+  border:1px solid var(--border-color); border-radius:6px; background:var(--bg-tertiary);
+  color:var(--text-primary); font-size:12px; cursor:pointer; transition:all 0.2s; white-space:nowrap;
+}
+.btn:hover { background:var(--border-color); border-color:var(--accent-blue); }
+.btn-primary { background:var(--accent-blue); color:#1a1b26; border-color:var(--accent-blue); font-weight:600; }
+.btn-primary:hover { background:#89b4fa; }
+.btn-green { background:var(--accent-green); color:#1a1b26; border-color:var(--accent-green); font-weight:600; }
+.btn-green:hover { background:#b5e87a; }
+.btn svg { width:14px; height:14px; }
+.btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* ===== Main Layout ===== */
+.main-container { display:flex; flex:1; overflow:hidden; position:relative; }
+.panel { display:flex; flex-direction:column; overflow:hidden; min-width:200px; }
+.panel-left { flex:1; border-right:1px solid var(--border-color); }
+.panel-right { flex:1; }
+.panel-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:6px 14px; background:var(--bg-secondary); border-bottom:1px solid var(--border-color);
+  min-height:36px; flex-shrink:0; gap:8px;
+}
+.panel-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); display:flex; align-items:center; gap:6px; }
+.dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+.dot-blue { background:var(--accent-blue); }
+.dot-green { background:var(--accent-green); }
+.dot-orange { background:var(--accent-orange); }
+.resize-handle { width:4px; background:var(--border-color); cursor:col-resize; transition:background 0.2s; z-index:10; flex-shrink:0; }
+.resize-handle:hover, .resize-handle.active { background:var(--accent-blue); }
+
+/* ===== Document Preview ===== */
+.preview-container { flex:1; overflow:auto; padding:20px; background:var(--bg-primary); position:relative; }
+.doc-preview {
+  max-width:800px; margin:0 auto; background:#fff; color:#1a1a1a;
+  padding:56px 68px; min-height:500px; box-shadow:var(--shadow); border-radius:4px;
+  font-family:'Calibri','SimSun',serif; font-size:14px; line-height:1.6;
+}
+.doc-preview h1 { font-size:24px; font-weight:700; margin:10px 0; }
+.doc-preview h2 { font-size:20px; font-weight:600; margin:8px 0; }
+.doc-preview h3 { font-size:16px; font-weight:600; margin:6px 0; }
+.doc-preview p { margin:5px 0; }
+.doc-preview table { border-collapse:collapse; width:100%; margin:10px 0; }
+.doc-preview td, .doc-preview th { border:1px solid #d0d0d0; padding:5px 8px; text-align:left; }
+.doc-preview th { background:#f0f0f0; font-weight:600; }
+.doc-preview ul, .doc-preview ol { margin:5px 0 5px 22px; }
+.doc-preview .xml-highlight { background:rgba(122,162,247,0.25); outline:2px solid var(--accent-blue); outline-offset:1px; border-radius:2px; }
+.doc-preview .xml-highlight-hover { background:rgba(122,162,247,0.12); outline:1px dashed var(--accent-blue); outline-offset:1px; border-radius:2px; }
+.doc-preview .xml-highlight-active { background:rgba(254,202,87,0.3); outline:2px solid var(--accent-orange); outline-offset:1px; border-radius:2px; }
+.doc-preview .template-field { background:rgba(158,206,106,0.2); outline:1.5px dashed var(--accent-green); outline-offset:1px; border-radius:3px; cursor:pointer; transition:all 0.15s; }
+.doc-preview .template-field:hover { background:rgba(158,206,106,0.35); outline-style:solid; }
+
+/* ===== Field Navigator ===== */
+.field-navigator {
+  position:absolute; top:36px; right:0; width:220px; max-height:280px; overflow-y:auto;
+  background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:0 0 0 8px;
+  box-shadow:var(--shadow); z-index:50; display:none;
+}
+.field-navigator.visible { display:block; }
+.field-navigator-header { padding:7px 12px; font-size:11px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border-color); position:sticky; top:0; background:var(--bg-secondary); display:flex; justify-content:space-between; align-items:center; }
+.field-item { display:flex; align-items:center; gap:8px; padding:6px 12px; cursor:pointer; transition:background 0.15s; font-size:12px; border-bottom:1px solid rgba(59,66,97,0.3); }
+.field-item:hover { background:var(--bg-tertiary); }
+.field-item .field-name { color:var(--text-primary); font-family:'JetBrains Mono',monospace; font-size:11px; flex:1; }
+
+/* ===== Drop Zone ===== */
+.drop-zone { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:14px; color:var(--text-muted); }
+.drop-zone-icon { width:72px; height:72px; border:2px dashed var(--border-color); border-radius:14px; display:flex; align-items:center; justify-content:center; transition:all 0.3s; }
+.drop-zone.drag-over .drop-zone-icon { border-color:var(--accent-blue); background:rgba(122,162,247,0.1); transform:scale(1.05); }
+.drop-zone svg { width:32px; height:32px; }
+.drop-zone-text { font-size:14px; color:var(--text-secondary); text-align:center; }
+.drop-zone-hint { font-size:12px; color:var(--text-muted); }
+
+/* ===== XML Editor ===== */
+.editor-container { flex:1; overflow:hidden; position:relative; }
+.CodeMirror { height:100% !important; font-family:'JetBrains Mono','Fira Code','Consolas',monospace; font-size:13px; line-height:1.6; background:var(--bg-primary) !important; }
+.CodeMirror-gutters { background:var(--bg-secondary) !important; border-right:1px solid var(--border-color) !important; }
+.CodeMirror-linenumber { color:var(--text-muted) !important; }
+.CodeMirror .cm-xml-highlight-active { background:rgba(254,202,87,0.12) !important; border-left:3px solid var(--accent-orange) !important; }
+.CodeMirror .cm-xml-highlight-line { background:rgba(122,162,247,0.1) !important; }
+
+/* ===== Apply Bar ===== */
+.apply-bar { display:none; align-items:center; justify-content:space-between; gap:10px; padding:6px 14px; background:rgba(122,162,247,0.08); border-bottom:1px solid var(--accent-blue); flex-shrink:0; }
+.apply-bar.visible { display:flex; }
+.apply-bar .message { font-size:12px; color:var(--accent-blue); }
+.apply-bar-actions { display:flex; align-items:center; gap:8px; }
+
+/* Auto-preview toggle */
+.auto-preview-wrap { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--text-muted); }
+.toggle { position:relative; width:28px; height:16px; cursor:pointer; }
+.toggle input { opacity:0; width:0; height:0; }
+.toggle-slider { position:absolute; inset:0; background:var(--border-color); border-radius:16px; transition:0.2s; }
+.toggle-slider::before { content:''; position:absolute; width:12px; height:12px; left:2px; bottom:2px; background:var(--text-muted); border-radius:50%; transition:0.2s; }
+.toggle input:checked + .toggle-slider { background:var(--accent-green); }
+.toggle input:checked + .toggle-slider::before { transform:translateX(12px); background:#1a1b26; }
+.debounce-indicator { width:6px; height:6px; border-radius:50%; background:var(--accent-orange); animation:pulse 1s infinite; display:none; }
+.debounce-indicator.active { display:inline-block; }
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+/* ===== Status Bar ===== */
+.status-bar { display:flex; align-items:center; justify-content:space-between; padding:0 14px; height:26px; background:var(--bg-secondary); border-top:1px solid var(--border-color); font-size:11px; color:var(--text-muted); flex-shrink:0; }
+.status-left, .status-right { display:flex; align-items:center; gap:14px; }
+.status-dot { width:6px; height:6px; border-radius:50%; background:var(--accent-green); }
+.status-dot.error { background:var(--accent-red); }
+.status-dot.warning { background:var(--accent-orange); }
+
+/* ===== Toast ===== */
+.toast-container { position:fixed; top:58px; right:18px; z-index:3000; display:flex; flex-direction:column; gap:6px; }
+.toast { padding:9px 14px; border-radius:7px; font-size:13px; box-shadow:0 4px 16px rgba(0,0,0,0.3); animation:slideIn 0.25s ease; display:flex; align-items:center; gap:8px; }
+.toast-success { background:#1a3a2a; color:var(--accent-green); border:1px solid rgba(158,206,106,0.3); }
+.toast-error { background:#3a1a1a; color:var(--accent-red); border:1px solid rgba(247,118,142,0.3); }
+.toast-info { background:#1a2a3a; color:var(--accent-cyan); border:1px solid rgba(125,207,255,0.3); }
+@keyframes slideIn { from{transform:translateX(100%);opacity:0;} to{transform:translateX(0);opacity:1;} }
+
+/* ===== Loading ===== */
+.loading-overlay { position:absolute; inset:0; background:rgba(26,27,38,0.8); display:none; align-items:center; justify-content:center; z-index:50; flex-direction:column; gap:12px; }
+.loading-overlay.visible { display:flex; }
+.spinner { width:28px; height:28px; border:3px solid var(--border-color); border-top-color:var(--accent-blue); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg);} }
+
+/* ===== OOXML Tooltip ===== */
+.ooxml-tooltip { position:fixed; z-index:2000; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:8px; padding:12px 15px; max-width:360px; box-shadow:0 8px 32px rgba(0,0,0,0.4); font-size:12px; line-height:1.5; pointer-events:none; opacity:0; transition:opacity 0.15s; }
+.ooxml-tooltip.visible { opacity:1; }
+.ooxml-tooltip .tag-name { color:var(--accent-blue); font-weight:700; font-family:'JetBrains Mono',monospace; font-size:13px; margin-bottom:5px; }
+.ooxml-tooltip .tag-desc { color:var(--text-secondary); margin-bottom:6px; }
+.ooxml-tooltip .tag-attrs { display:flex; flex-direction:column; gap:3px; }
+.ooxml-tooltip .attr-row { display:flex; gap:8px; font-size:11px; }
+.ooxml-tooltip .attr-name { color:var(--accent-purple); font-family:'JetBrains Mono',monospace; min-width:90px; }
+.ooxml-tooltip .attr-desc { color:var(--text-muted); }
+.ooxml-tooltip .spec-link { display:inline-block; margin-top:7px; padding-top:7px; border-top:1px solid var(--border-color); color:var(--accent-cyan); font-size:11px; }
+
+/* ===== Field Form Panel ===== */
+.form-panel { flex:1; overflow:auto; padding:16px; background:var(--bg-primary); display:none; }
+.form-panel.visible { display:block; }
+.form-section-title { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:12px; padding-bottom:6px; border-bottom:1px solid var(--border-color); display:flex; align-items:center; gap:6px; }
+.form-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:200px; gap:10px; color:var(--text-muted); text-align:center; font-size:13px; }
+.field-input-row { margin-bottom:14px; }
+.field-input-label { font-size:11px; font-weight:600; color:var(--accent-green); font-family:'JetBrains Mono',monospace; margin-bottom:5px; display:flex; align-items:center; gap:6px; }
+.field-input-label .field-pattern { font-size:10px; color:var(--text-muted); font-weight:400; }
+.field-input-box { width:100%; padding:7px 10px; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:5px; color:var(--text-primary); font-size:13px; outline:none; transition:border-color 0.15s; font-family:inherit; }
+.field-input-box:focus { border-color:var(--accent-green); }
+.form-actions { display:flex; gap:8px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-color); }
+.form-preview-note { font-size:11px; color:var(--text-muted); margin-top:10px; line-height:1.5; }
+
+/* ===== Modal Overlay ===== */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; display:none; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
+.modal-overlay.visible { display:flex; }
+.modal { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:12px; width:min(860px, 95vw); max-height:88vh; display:flex; flex-direction:column; box-shadow:0 16px 48px rgba(0,0,0,0.5); overflow:hidden; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border-color); flex-shrink:0; }
+.modal-title { font-size:15px; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:8px; }
+.modal-title svg { width:18px; height:18px; color:var(--accent-green); }
+.modal-close { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:5px; cursor:pointer; color:var(--text-muted); transition:all 0.15s; border:none; background:transparent; }
+.modal-close:hover { background:var(--bg-tertiary); color:var(--text-primary); }
+.modal-body { flex:1; overflow-y:auto; padding:20px; }
+.modal-footer { padding:14px 20px; border-top:1px solid var(--border-color); display:flex; align-items:center; justify-content:flex-end; gap:10px; flex-shrink:0; }
+
+/* ===== Batch Mode ===== */
+.batch-steps { display:flex; gap:8px; margin-bottom:20px; }
+.batch-step { flex:1; padding:10px 12px; background:var(--bg-tertiary); border-radius:8px; border:1px solid var(--border-color); font-size:12px; }
+.batch-step .step-num { width:20px; height:20px; border-radius:50%; background:var(--border-color); color:var(--text-muted); display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; margin-bottom:5px; }
+.batch-step.active .step-num { background:var(--accent-green); color:#1a1b26; }
+.batch-step .step-label { color:var(--text-muted); font-weight:500; }
+.batch-step.active .step-label { color:var(--text-primary); }
+
+.data-drop-zone { border:2px dashed var(--border-color); border-radius:8px; padding:28px; text-align:center; cursor:pointer; transition:all 0.2s; }
+.data-drop-zone:hover, .data-drop-zone.drag-over { border-color:var(--accent-green); background:rgba(158,206,106,0.05); }
+.data-drop-zone svg { width:36px; height:36px; color:var(--text-muted); margin-bottom:8px; }
+.data-drop-zone p { color:var(--text-secondary); font-size:13px; }
+.data-drop-zone small { color:var(--text-muted); font-size:11px; }
+
+.data-table-wrap { overflow:auto; max-height:240px; border:1px solid var(--border-color); border-radius:6px; margin-top:12px; }
+.data-table { width:100%; border-collapse:collapse; font-size:12px; }
+.data-table th { background:var(--bg-tertiary); color:var(--text-muted); font-weight:600; padding:6px 10px; text-align:left; border-bottom:1px solid var(--border-color); position:sticky; top:0; }
+.data-table td { padding:5px 10px; border-bottom:1px solid rgba(59,66,97,0.4); color:var(--text-primary); }
+.data-table tr:hover td { background:var(--bg-tertiary); }
+
+.field-mapping { margin-top:16px; }
+.mapping-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:12px; }
+.mapping-field { font-family:'JetBrains Mono',monospace; color:var(--accent-green); background:rgba(158,206,106,0.1); padding:3px 8px; border-radius:4px; font-size:11px; min-width:120px; }
+.mapping-arrow { color:var(--text-muted); }
+.mapping-select { flex:1; background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:5px; color:var(--text-primary); padding:4px 8px; font-size:12px; outline:none; }
+
+.batch-progress-wrap { margin-top:14px; }
+.batch-progress-bar { height:6px; background:var(--border-color); border-radius:3px; overflow:hidden; }
+.batch-progress-fill { height:100%; background:var(--accent-green); transition:width 0.3s; }
+.batch-progress-text { font-size:11px; color:var(--text-muted); margin-top:5px; text-align:right; }
+
+/* ===== Diff Mode ===== */
+.diff-layout { display:flex; gap:0; height:100%; overflow:hidden; }
+.diff-pane { flex:1; display:flex; flex-direction:column; overflow:hidden; border-right:1px solid var(--border-color); }
+.diff-pane:last-child { border-right:none; }
+.diff-pane-header { padding:8px 14px; background:var(--bg-tertiary); border-bottom:1px solid var(--border-color); font-size:12px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.diff-pane-header .pane-title { color:var(--text-secondary); font-weight:600; display:flex; align-items:center; gap:6px; }
+.diff-content { flex:1; overflow:auto; font-family:'JetBrains Mono',monospace; font-size:11px; line-height:1.6; }
+.diff-line { display:flex; gap:0; min-width:0; }
+.diff-line-num { min-width:40px; padding:1px 6px; text-align:right; color:var(--text-muted); font-size:10px; background:var(--bg-secondary); border-right:1px solid var(--border-color); user-select:none; flex-shrink:0; }
+.diff-line-text { flex:1; padding:1px 8px; white-space:pre; overflow:hidden; text-overflow:ellipsis; color:var(--text-secondary); }
+.diff-added .diff-line-text { background:rgba(158,206,106,0.12); color:var(--accent-green); }
+.diff-added .diff-line-num { background:rgba(158,206,106,0.08); }
+.diff-removed .diff-line-text { background:rgba(247,118,142,0.12); color:var(--accent-red); text-decoration:line-through; }
+.diff-removed .diff-line-num { background:rgba(247,118,142,0.08); }
+.diff-changed .diff-line-text { background:rgba(224,175,104,0.12); color:var(--accent-orange); }
+.diff-empty { display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-family:inherit; font-size:13px; }
+.diff-stats { display:flex; gap:14px; font-size:11px; }
+.diff-stat-add { color:var(--accent-green); }
+.diff-stat-rem { color:var(--accent-red); }
+.diff-stat-chg { color:var(--accent-orange); }
+
+/* ===== Editor Empty State ===== */
+.editor-empty { display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-muted); font-size:13px; text-align:center; padding:20px; flex-direction:column; gap:8px; }
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar { width:7px; height:7px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border-color); border-radius:4px; }
+::-webkit-scrollbar-thumb:hover { background:var(--text-muted); }
+
+@media (max-width:768px) {
+  .main-container { flex-direction:column; }
+  .mode-tabs { display:none; }
+  .panel-left { border-right:none; border-bottom:1px solid var(--border-color); }
+  .resize-handle { width:100%; height:4px; cursor:row-resize; }
+  .doc-preview { padding:28px 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      OOXML Pro
+    </div>
+    <span class="file-name" id="fileName">未加载文件</span>
+  </div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="editor" onclick="switchMode('editor')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      XML 编辑
+    </button>
+    <button class="mode-tab" data-mode="form" onclick="switchMode('form')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      字段表单
+    </button>
+    <button class="mode-tab" data-mode="batch" onclick="openBatchModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+      批量生成
+    </button>
+    <button class="mode-tab" data-mode="diff" onclick="openDiffModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+      文档对比
+    </button>
+  </div>
+
+  <div class="header-actions">
+    <label class="btn" for="fileInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      打开 DOCX
+    </label>
+    <input type="file" id="fileInput" accept=".docx" style="display:none">
+    <button class="btn btn-primary" id="btnExport" disabled onclick="exportDocx()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      导出 DOCX
+    </button>
+    <button class="btn" onclick="openBatchModal()" title="批量生成文档">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 9h2m2 0h2m2 0h2"/></svg>
+      批量生成
+    </button>
+  </div>
+</header>
+
+<!-- Main Editor View -->
+<div class="main-container" id="mainContainer">
+  <!-- Left Panel: Document Preview -->
+  <div class="panel panel-left" id="panelLeft">
+    <div class="panel-header" style="position:relative;">
+      <span class="panel-title"><span class="dot dot-green"></span> 文档预览</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn" id="btnFieldNav" style="padding:2px 8px;font-size:11px;display:none;" title="模板字段导航">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          字段 <span id="fieldCount" style="color:var(--accent-green);font-weight:700;">0</span>
+        </button>
+        <span style="font-size:11px;color:var(--text-muted)" id="previewInfo"></span>
+      </div>
+      <div class="field-navigator" id="fieldNavigator">
+        <div class="field-navigator-header">
+          <span>模板字段</span>
+          <span style="background:var(--accent-green);color:#1a1b26;padding:0 5px;border-radius:8px;font-size:10px;" id="fieldNavCount">0</span>
+        </div>
+        <div id="fieldList"></div>
+      </div>
+    </div>
+    <div class="preview-container" id="previewContainer">
+      <div class="drop-zone" id="dropZone">
+        <div class="drop-zone-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div class="drop-zone-text">拖拽 .docx 文件到此处</div>
+        <div class="drop-zone-hint">或点击上方「打开 DOCX」按钮</div>
+      </div>
+      <div class="doc-preview" id="docPreview" style="display:none"></div>
+    </div>
+    <div class="loading-overlay" id="previewLoading"><div class="spinner"></div></div>
+  </div>
+
+  <div class="resize-handle" id="resizeHandle"></div>
+
+  <!-- Right Panel: XML Editor or Form -->
+  <div class="panel panel-right" id="panelRight">
+    <div class="panel-header" id="rightPanelHeader">
+      <span class="panel-title"><span class="dot dot-blue"></span> <span id="rightPanelTitle">document.xml</span></span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="auto-preview-wrap" id="autoPreviewWrap">
+          <span class="debounce-indicator" id="debounceIndicator"></span>
+          <label class="toggle" title="实时预览（500ms 自动应用）">
+            <input type="checkbox" id="autoPreviewToggle">
+            <span class="toggle-slider"></span>
+          </label>
+          <span>实时预览</span>
+        </div>
+        <span style="font-size:11px;color:var(--text-muted)" id="editorInfo">OOXML</span>
+      </div>
+    </div>
+    <div class="apply-bar" id="applyBar">
+      <span class="message">XML 已修改 — Ctrl+Enter 应用，或开启实时预览</span>
+      <div class="apply-bar-actions">
+        <button class="btn" style="padding:3px 10px;font-size:11px;" onclick="applyChanges()">应用修改</button>
+      </div>
+    </div>
+    <!-- XML Editor (mode: editor) -->
+    <div class="editor-container" id="editorContainer">
+      <div class="editor-empty" id="editorEmpty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted)"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <span>加载 DOCX 后显示 document.xml</span>
+        <span style="font-size:11px;">支持悬停查看 OOXML 规范说明</span>
+      </div>
+    </div>
+    <!-- Form Panel (mode: form) -->
+    <div class="form-panel" id="formPanel">
+      <div class="form-empty" id="formEmpty">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted)"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span>加载含有 <code style="background:var(--bg-tertiary);padding:1px 6px;border-radius:3px;">{{字段}}</code> 占位符的 DOCX 后</span>
+        <span style="font-size:11px;color:var(--text-muted)">此处会自动生成填写表单</span>
+      </div>
+      <div id="formContent" style="display:none">
+        <div class="form-section-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          模板字段填写
+        </div>
+        <div id="fieldInputs"></div>
+        <div class="form-actions">
+          <button class="btn btn-green" onclick="applyFormAndPreview()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            预览替换效果
+          </button>
+          <button class="btn btn-primary" onclick="applyFormAndExport()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            直接导出
+          </button>
+        </div>
+        <p class="form-preview-note">预览替换效果不会修改 XML，点击「直接导出」才会写入文件。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Status Bar -->
+<div class="status-bar">
+  <div class="status-left">
+    <span style="display:flex;align-items:center;gap:5px;"><span class="status-dot" id="statusDot"></span><span id="statusText">就绪</span></span>
+    <span id="xmlStatus"></span>
+  </div>
+  <div class="status-right">
+    <span id="cursorPos"></span>
+    <span id="xmlSize"></span>
+  </div>
+</div>
+
+<!-- OOXML Tooltip -->
+<div class="ooxml-tooltip" id="ooxmlTooltip"></div>
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ===== Batch Generation Modal ===== -->
+<div class="modal-overlay" id="batchModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        批量生成文档
+      </div>
+      <button class="modal-close" onclick="closeBatchModal()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="batch-steps">
+        <div class="batch-step active" id="bstep1"><div class="step-num">1</div><div class="step-label">上传数据</div></div>
+        <div class="batch-step" id="bstep2"><div class="step-num">2</div><div class="step-label">字段映射</div></div>
+        <div class="batch-step" id="bstep3"><div class="step-num">3</div><div class="step-label">生成下载</div></div>
+      </div>
+
+      <!-- Step 1: Upload Data -->
+      <div id="batchStep1">
+        <div class="data-drop-zone" id="dataDropZone" onclick="document.getElementById('csvInput').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p>拖拽或点击上传 CSV / JSON 数据文件</p>
+          <small>CSV 第一行为字段名；JSON 为对象数组 [{key:value,...}]</small>
+        </div>
+        <input type="file" id="csvInput" accept=".csv,.json,.txt" style="display:none">
+        <div id="dataPreviewWrap" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:6px;">
+            <span style="font-size:12px;color:var(--text-muted)">数据预览（前 5 行）</span>
+            <span style="font-size:11px;color:var(--accent-green);" id="dataRowCount"></span>
+          </div>
+          <div class="data-table-wrap"><table class="data-table" id="dataPreviewTable"></table></div>
+        </div>
+        <!-- Manual data entry -->
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color);">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">或者粘贴 JSON 数据：</div>
+          <textarea id="manualJsonInput" placeholder='[{"name":"张三","date":"2024-01-01"},{"name":"李四","date":"2024-01-02"}]'
+            style="width:100%;height:80px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:5px;color:var(--text-primary);padding:8px;font-family:monospace;font-size:12px;outline:none;resize:vertical;"></textarea>
+          <button class="btn" style="margin-top:6px;font-size:11px;" onclick="loadManualJson()">解析 JSON</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Field Mapping -->
+      <div id="batchStep2" style="display:none">
+        <div class="field-mapping">
+          <div class="form-section-title" style="margin-bottom:10px;">字段映射 — 模板字段 → 数据列</div>
+          <div id="mappingRows"></div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color);">
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">输出文件名模板（可使用数据列名作为变量）：</div>
+          <input type="text" id="filenameTemplate" placeholder="文档_{{name}}" value="文档_{{index}}"
+            style="width:100%;padding:7px 10px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:5px;color:var(--text-primary);font-size:12px;outline:none;">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">可用变量：{{index}} 为行号（1起），以及所有数据列名</div>
+        </div>
+      </div>
+
+      <!-- Step 3: Generate -->
+      <div id="batchStep3" style="display:none">
+        <div style="text-align:center;padding:20px 0;">
+          <div id="batchReadyMsg" style="color:var(--text-secondary);font-size:14px;margin-bottom:16px;"></div>
+          <div class="batch-progress-wrap" id="batchProgressWrap" style="display:none;">
+            <div class="batch-progress-bar"><div class="batch-progress-fill" id="batchProgressFill" style="width:0%"></div></div>
+            <div class="batch-progress-text" id="batchProgressText">0 / 0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="batchPrevBtn" onclick="batchStepPrev()" style="display:none;">上一步</button>
+      <button class="btn btn-green" id="batchNextBtn" onclick="batchStepNext()">下一步</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Diff Comparison Modal ===== -->
+<div class="modal-overlay" id="diffModal">
+  <div class="modal" style="width:min(1100px,97vw);max-height:92vh;">
+    <div class="modal-header">
+      <div class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/></svg>
+        文档 XML 对比
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="diff-stats" id="diffStats"></div>
+        <button class="modal-close" onclick="closeDiffModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:500px;">
+      <div class="diff-layout" style="flex:1;overflow:hidden;">
+        <!-- Left Diff Pane -->
+        <div class="diff-pane">
+          <div class="diff-pane-header">
+            <span class="pane-title">
+              <span class="dot dot-blue"></span>
+              <span id="diffPane1Title">当前文档</span>
+            </span>
+            <span style="font-size:11px;color:var(--text-muted)" id="diffPane1Lines"></span>
+          </div>
+          <div class="diff-content" id="diffContent1">
+            <div class="diff-empty">当前未加载文档</div>
+          </div>
+        </div>
+        <!-- Right Diff Pane -->
+        <div class="diff-pane">
+          <div class="diff-pane-header">
+            <span class="pane-title">
+              <span class="dot dot-orange"></span>
+              <span id="diffPane2Title">对比文档</span>
+            </span>
+            <label class="btn" for="diffFileInput" style="padding:3px 10px;font-size:11px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              加载第二个 DOCX
+            </label>
+            <input type="file" id="diffFileInput" accept=".docx" style="display:none" onchange="loadDiffDocx(event)">
+          </div>
+          <div class="diff-content" id="diffContent2">
+            <div class="diff-empty">点击「加载第二个 DOCX」进行对比</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =====================================================================
+// OOXML 规范参考
+// =====================================================================
+const OOXML_SPEC = {
+  'w:document':{ desc:'文档根元素 — 包含整个 Word 文档的主要内容', spec:'ECMA-376 Part 1, §17.6' },
+  'w:body':{ desc:'文档主体 — 包含文档的主要内容和节属性', spec:'ECMA-376 Part 1, §17.2.2' },
+  'w:p':{ desc:'段落 — 文档中最基本的块级元素', spec:'ECMA-376 Part 1, §17.3.1.22', attrs:{'w:rsidR':'段落标识符','w:rsidRDefault':'默认段落属性标识符'} },
+  'w:pPr':{ desc:'段落属性 — 定义段落的格式设置', spec:'ECMA-376 Part 1, §17.3.1.26', attrs:{'w:styleId':'段落样式引用','w:keepNext':'与下一段保持在一起','w:pageBreakBefore':'段前分页'} },
+  'w:pStyle':{ desc:'段落样式引用 — 指定段落使用的命名样式', spec:'ECMA-376 Part 1, §17.3.1.27', attrs:{'w:val':'样式 ID，如 "Heading1", "Normal"'} },
+  'w:jc':{ desc:'段落对齐方式', spec:'ECMA-376 Part 1, §17.3.1.13', attrs:{'w:val':'left/center/right/both/distribute'} },
+  'w:ind':{ desc:'段落缩进', spec:'ECMA-376 Part 1, §17.3.1.12', attrs:{'w:left':'左缩进（缇）','w:right':'右缩进','w:firstLine':'首行缩进','w:hanging':'悬挂缩进'} },
+  'w:spacing':{ desc:'段落间距', spec:'ECMA-376 Part 1, §17.3.1.33', attrs:{'w:before':'段前间距（缇）','w:after':'段后间距','w:line':'行距','w:lineRule':'auto/exact/atLeast'} },
+  'w:r':{ desc:'运行 — 段落中具有相同格式的连续文本区域', spec:'ECMA-376 Part 1, §17.3.2.25' },
+  'w:rPr':{ desc:'运行属性 — 定义文本的字体、大小、颜色等', spec:'ECMA-376 Part 1, §17.3.2.28', attrs:{'w:b':'加粗','w:i':'斜体','w:u':'下划线','w:sz':'字号（半磅）','w:color':'字体颜色'} },
+  'w:t':{ desc:'文本 — 包含实际的文本内容', spec:'ECMA-376 Part 1, §17.3.2.37', attrs:{'xml:space':'preserve=保留空格'} },
+  'w:br':{ desc:'换行符', spec:'ECMA-376 Part 1, §17.3.2.3', attrs:{'w:type':'line/page/column'} },
+  'w:tab':{ desc:'制表符', spec:'ECMA-376 Part 1, §17.3.2.35' },
+  'w:rFonts':{ desc:'字体设置', spec:'ECMA-376 Part 1, §17.3.2.26', attrs:{'w:ascii':'ASCII字体','w:eastAsia':'东亚字体','w:hAnsi':'hAnsi字体'} },
+  'w:b':{ desc:'加粗', spec:'ECMA-376 Part 1, §17.3.2.1', attrs:{'w:val':'true/false'} },
+  'w:i':{ desc:'斜体', spec:'ECMA-376 Part 1, §17.3.2.7', attrs:{'w:val':'true/false'} },
+  'w:u':{ desc:'下划线', spec:'ECMA-376 Part 1, §17.3.2.40', attrs:{'w:val':'single/double/thick/dotted/none'} },
+  'w:sz':{ desc:'字号 (半磅，如24=12磅)', spec:'ECMA-376 Part 1, §17.3.2.38', attrs:{'w:val':'字号值'} },
+  'w:color':{ desc:'字体颜色', spec:'ECMA-376 Part 1, §17.3.2.5', attrs:{'w:val':'十六进制颜色或 auto'} },
+  'w:highlight':{ desc:'文本高亮', spec:'ECMA-376 Part 1, §17.3.2.10', attrs:{'w:val':'yellow/green/cyan/red/none'} },
+  'w:shd':{ desc:'底纹', spec:'ECMA-376 Part 1, §17.3.2.32', attrs:{'w:val':'clear/solid','w:fill':'背景填充色'} },
+  'w:tbl':{ desc:'表格', spec:'ECMA-376 Part 1, §17.4.38' },
+  'w:tblPr':{ desc:'表格属性', spec:'ECMA-376 Part 1, §17.4.39', attrs:{'w:tblW':'表格宽度','w:tblLayout':'fixed/autofit'} },
+  'w:tblGrid':{ desc:'表格网格 — 定义各列宽度', spec:'ECMA-376 Part 1, §17.4.40' },
+  'w:tr':{ desc:'表格行', spec:'ECMA-376 Part 1, §17.4.44' },
+  'w:trPr':{ desc:'行属性', spec:'ECMA-376 Part 1, §17.4.45' },
+  'w:tc':{ desc:'表格单元格', spec:'ECMA-376 Part 1, §17.4.41' },
+  'w:tcPr':{ desc:'单元格属性', spec:'ECMA-376 Part 1, §17.4.42', attrs:{'w:gridSpan':'合并列数','w:vMerge':'纵向合并'} },
+  'w:sectPr':{ desc:'节属性 — 定义页面布局', spec:'ECMA-376 Part 1, §17.6.5' },
+  'w:pgSz':{ desc:'页面大小', spec:'ECMA-376 Part 1, §17.6.11', attrs:{'w:w':'宽度（缇）','w:h':'高度（缇）','w:orient':'portrait/landscape'} },
+  'w:pgMar':{ desc:'页边距', spec:'ECMA-376 Part 1, §17.6.9', attrs:{'w:top':'上','w:right':'右','w:bottom':'下','w:left':'左','w:header':'页眉','w:footer':'页脚'} },
+  'w:styles':{ desc:'样式集合', spec:'ECMA-376 Part 1, §17.7.4' },
+  'w:style':{ desc:'样式定义', spec:'ECMA-376 Part 1, §17.7.4.17', attrs:{'w:type':'paragraph/character/table','w:styleId':'样式ID','w:default':'是否默认'} },
+  'w:numPr':{ desc:'编号属性', spec:'ECMA-376 Part 1, §17.3.1.19', attrs:{'w:ilvl':'级别','w:numId':'编号ID'} },
+  'w:hyperlink':{ desc:'超链接', spec:'ECMA-376 Part 1, §17.3.1.9', attrs:{'r:id':'关系ID'} },
+  'w:drawing':{ desc:'绘图对象', spec:'ECMA-376 Part 1, §17.3.2.8' },
+  'w:fldChar':{ desc:'域字符', spec:'ECMA-376 Part 1, §17.3.2.6', attrs:{'w:fldCharType':'begin/separate/end'} },
+  'w:instrText':{ desc:'域代码文本', spec:'ECMA-376 Part 1, §17.3.2.25' },
+  'w:bookmarkStart':{ desc:'书签开始', spec:'ECMA-376 Part 1, §17.3.2.2', attrs:{'w:id':'书签ID','w:name':'书签名称'} },
+  'w:bookmarkEnd':{ desc:'书签结束', spec:'ECMA-376 Part 1, §17.3.2.2' }
+};
+
+// =====================================================================
+// 全局状态
+// =====================================================================
+let docxZip = null;
+let originalXml = '';
+let editor = null;
+let xmlModified = false;
+let currentParagraphs = [];
+let detectedFields = [];
+let autoPreviewTimer = null;
+
+// Batch state
+let batchData = { headers:[], rows:[] };
+let batchCurrentStep = 1;
+let batchMapping = {};
+let batchResultLog = [];
+let batchRunning = false;
+let batchFilenameTemplate = '文档_{{index}}';
+
+// Diff state
+let diffXml2 = '';
+
+// =====================================================================
+// 工具函数
+// =====================================================================
+function showToast(message, type='info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success:'✓', error:'✗', info:'ℹ' };
+  t.innerHTML = `<span>${icons[type]||'ℹ'}</span> ${message}`;
+  c.appendChild(t);
+  setTimeout(() => {
+    t.style.opacity='0'; t.style.transform='translateX(100%)'; t.style.transition='all 0.3s';
+    setTimeout(() => t.remove(), 300);
+  }, 3000);
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+}
+
+function formatXml(xml) {
+  const PADDING = '  ';
+  let formatted='', indent=0;
+  xml.replace(/(>)\s*(<)/g, '$1\n$2').split('\n').forEach(tag => {
+    if (tag.match(/^<\/\w/)) indent--;
+    formatted += PADDING.repeat(Math.max(0,indent)) + tag + '\n';
+    if (tag.match(/^<\w[^>]*[^\/]>/) && !tag.match(/<.*\/.*>/)) indent++;
+  });
+  return formatted.trim();
+}
+
+function getChild(parent, localName) {
+  const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+  for (let i=0; i<parent.childNodes.length; i++) {
+    const c = parent.childNodes[i];
+    if (c.localName===localName && c.namespaceURI===ns) return c;
+  }
+  return null;
+}
+
+// =====================================================================
+// DOCX 解析
+// =====================================================================
+async function loadDocx(file) {
+  try {
+    document.getElementById('previewLoading').classList.add('visible');
+    document.getElementById('statusText').textContent = '正在解析...';
+    const arrayBuffer = await file.arrayBuffer();
+    docxZip = await JSZip.loadAsync(arrayBuffer);
+    const docXmlFile = docxZip.file('word/document.xml');
+    if (!docXmlFile) throw new Error('无效的 DOCX：找不到 word/document.xml');
+    originalXml = await docXmlFile.async('string');
+    let displayXml = originalXml;
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(originalXml, 'application/xml');
+      displayXml = formatXml(new XMLSerializer().serializeToString(doc));
+    } catch(e) {}
+    initEditor(displayXml);
+    await renderPreview();
+    document.getElementById('dropZone').style.display = 'none';
+    document.getElementById('docPreview').style.display = 'block';
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('btnExport').disabled = false;
+    document.getElementById('statusDot').className = 'status-dot';
+    document.getElementById('statusText').textContent = '文件已加载';
+    document.getElementById('xmlStatus').textContent = `document.xml (${(originalXml.length/1024).toFixed(1)} KB)`;
+    showToast(`已加载 ${file.name}`, 'success');
+    // If in form mode, rebuild form
+    if (currentMode === 'form') buildFieldForm();
+  } catch(error) {
+    showToast(`加载失败: ${error.message}`, 'error');
+    document.getElementById('statusDot').className = 'status-dot error';
+    document.getElementById('statusText').textContent = '加载失败';
+  } finally {
+    document.getElementById('previewLoading').classList.remove('visible');
+  }
+}
+
+// =====================================================================
+// 预览渲染
+// =====================================================================
+async function renderPreview() {
+  const preview = document.getElementById('docPreview');
+  preview.innerHTML = '<div style="color:#999;text-align:center;padding:40px">正在渲染...</div>';
+  try {
+    if (typeof mammoth !== 'undefined') {
+      const arrayBuffer = await docxZip.generateAsync({ type:'arraybuffer' });
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      let html = result.value;
+      html = html.replace(/<p([^>]*)>/g, '<p$1 data-ooxml-type="p">');
+      html = html.replace(/<h([1-6])([^>]*)>/g, '<h$1$2 data-ooxml-type="h$1">');
+      html = html.replace(/<li([^>]*)>/g, '<li$1 data-ooxml-type="li">');
+      html = html.replace(/<td([^>]*)>/g, '<td$1 data-ooxml-type="td">');
+      preview.innerHTML = html;
+    } else {
+      preview.innerHTML = renderXmlToHtml(originalXml);
+    }
+    buildParagraphMap();
+    detectAndMarkFields();
+    const paragraphs = preview.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li');
+    document.getElementById('previewInfo').textContent = `${paragraphs.length} 段落`;
+  } catch(error) {
+    preview.innerHTML = `<div style="color:#f7768e;padding:20px"><strong>预览失败</strong><br><span style="font-size:12px">${error.message}</span></div>`;
+  }
+}
+
+function renderXmlToHtml(xml) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'application/xml');
+    if (doc.querySelector('parsererror')) return '<p style="color:red">XML 解析错误</p>';
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const body = doc.getElementsByTagNameNS(ns, 'body')[0];
+    if (!body) return '<p style="color:#999">无法找到文档主体</p>';
+    let html = '';
+    function proc(node) {
+      if (node.nodeType===3) return escapeHtml(node.textContent);
+      if (node.namespaceURI!==ns) return '';
+      const n = node.localName;
+      switch(n) {
+        case 'p': {
+          let style=''; const pPr=getChild(node,'pPr');
+          if (pPr) { const jc=getChild(pPr,'jc'); if(jc) style=` style="text-align:${jc.getAttribute('w:val')}"`; }
+          let c=''; node.childNodes.forEach(ch=>{c+=proc(ch);});
+          return `<p${style} data-ooxml-type="p">${c}</p>`;
+        }
+        case 'r': {
+          let c='', styles=[];
+          const rPr=getChild(node,'rPr');
+          if(rPr){
+            if(getChild(rPr,'b')) styles.push('font-weight:bold');
+            if(getChild(rPr,'i')) styles.push('font-style:italic');
+            if(getChild(rPr,'u')) styles.push('text-decoration:underline');
+            const sz=getChild(rPr,'sz'); if(sz) styles.push(`font-size:${parseInt(sz.getAttribute('w:val')||'24')/2}pt`);
+            const col=getChild(rPr,'color'); if(col) styles.push(`color:#${col.getAttribute('w:val')}`);
+          }
+          node.childNodes.forEach(ch=>{c+=proc(ch);});
+          return styles.length ? `<span style="${styles.join(';')}">${c}</span>` : c;
+        }
+        case 't': return escapeHtml(node.textContent);
+        case 'br': return '<br>';
+        case 'tab': return '&nbsp;&nbsp;&nbsp;&nbsp;';
+        case 'tbl': { let c=''; node.childNodes.forEach(ch=>{c+=proc(ch);}); return `<table>${c}</table>`; }
+        case 'tr': { let c=''; node.childNodes.forEach(ch=>{c+=proc(ch);}); return `<tr>${c}</tr>`; }
+        case 'tc': { let c=''; node.childNodes.forEach(ch=>{c+=proc(ch);}); return `<td data-ooxml-type="td">${c}</td>`; }
+        default: return '';
+      }
+    }
+    body.childNodes.forEach(ch=>{html+=proc(ch);});
+    return html||'<p style="color:#999">文档内容为空</p>';
+  } catch(e) { return `<p style="color:red">渲染错误: ${escapeHtml(e.message)}</p>`; }
+}
+
+// =====================================================================
+// 段落映射
+// =====================================================================
+function buildParagraphMap() {
+  currentParagraphs = [];
+  const preview = document.getElementById('docPreview');
+  preview.querySelectorAll('[data-ooxml-type]').forEach((el,i) => {
+    currentParagraphs.push({ index:i, element:el, type:el.getAttribute('data-ooxml-type') });
+  });
+}
+
+// =====================================================================
+// 模板字段检测
+// =====================================================================
+const FIELD_PATTERNS = [
+  /\{\{(\w+)\}\}/g,
+  /\$\{(\w+)\}/g,
+  /\[(\w[\w\s]*)\]/g,
+  /#(\w+)#/g,
+];
+
+function detectAndMarkFields() {
+  const preview = document.getElementById('docPreview');
+  if (!preview || preview.style.display==='none') return;
+  detectedFields = [];
+  const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT, null, false);
+  const textNodes = [];
+  while (walker.nextNode()) { if (walker.currentNode.textContent.trim()) textNodes.push(walker.currentNode); }
+  textNodes.forEach(textNode => {
+    const text = textNode.textContent;
+    const allMatches = [];
+    for (const pattern of FIELD_PATTERNS) {
+      pattern.lastIndex = 0; let m;
+      while ((m=pattern.exec(text))!==null) {
+        allMatches.push({ start:m.index, end:m.index+m[0].length, name:m[1], full:m[0] });
+        if (!detectedFields.find(f=>f.name===m[1])) detectedFields.push({ name:m[1], fullMatch:m[0], preview:text.substring(0,30) });
+      }
+    }
+    if (!allMatches.length) return;
+    allMatches.sort((a,b)=>a.start-b.start);
+    const filtered=[]; let lastEnd=0;
+    for (const m of allMatches) { if(m.start>=lastEnd){filtered.push(m);lastEnd=m.end;} }
+    const fragment = document.createDocumentFragment();
+    let lastIndex=0;
+    filtered.forEach(m => {
+      if (m.start>lastIndex) fragment.appendChild(document.createTextNode(text.substring(lastIndex,m.start)));
+      const span=document.createElement('span');
+      span.className='template-field'; span.setAttribute('data-field-name',m.name); span.textContent=m.full;
+      fragment.appendChild(span); lastIndex=m.end;
+    });
+    if (lastIndex<text.length) fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+    textNode.parentNode.replaceChild(fragment, textNode);
+  });
+  updateFieldNavigator();
+}
+
+function updateFieldNavigator() {
+  const btn = document.getElementById('btnFieldNav');
+  if (detectedFields.length===0) { btn.style.display='none'; return; }
+  btn.style.display='inline-flex';
+  document.getElementById('fieldCount').textContent = detectedFields.length;
+  document.getElementById('fieldNavCount').textContent = detectedFields.length;
+  const list = document.getElementById('fieldList');
+  list.innerHTML='';
+  detectedFields.forEach(field => {
+    const item=document.createElement('div'); item.className='field-item';
+    item.innerHTML=`<span class="field-name">{{${field.name}}}</span><span style="font-size:10px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${field.preview}</span>`;
+    item.addEventListener('click', e=>{e.stopPropagation(); navigateToField(field.name); document.getElementById('fieldNavigator').classList.remove('visible');});
+    list.appendChild(item);
+  });
+}
+
+function navigateToField(fieldName) {
+  if (!editor) return;
+  const content = editor.getValue();
+  const patterns = [`{{${fieldName}}}`, `\${${fieldName}}`, `[${fieldName}]`, `#${fieldName}#`];
+  for (const p of patterns) {
+    const idx = content.indexOf(p);
+    if (idx!==-1) {
+      const before = content.substring(0,idx);
+      const line = before.split('\n').length-1;
+      const ch = before.split('\n').pop().length;
+      clearEditorActiveHighlight();
+      editor.addLineClass(line,'background','cm-xml-highlight-active');
+      editor.setCursor({line,ch}); editor.focus();
+      editor.setSelection({line,ch},{line,ch:ch+p.length});
+      editor.scrollIntoView({line,ch},100);
+      showToast(`已定位: ${fieldName}`, 'success'); return;
+    }
+  }
+  showToast(`未找到字段: ${fieldName}`, 'error');
+}
+
+// =====================================================================
+// XML 编辑器
+// =====================================================================
+function initEditor(xmlContent) {
+  const container = document.getElementById('editorContainer');
+  const empty = document.getElementById('editorEmpty');
+  if (empty) empty.style.display='none';
+  if (editor) { editor.toTextArea(); }
+  let textarea = container.querySelector('textarea');
+  if (!textarea) { textarea=document.createElement('textarea'); container.appendChild(textarea); }
+  textarea.value = xmlContent;
+  editor = CodeMirror.fromTextArea(textarea, {
+    mode:'xml', theme:'monokai', lineNumbers:true, lineWrapping:true,
+    autoCloseTags:true, autoCloseBrackets:true, indentUnit:2, tabSize:2,
+    matchTags:{bothTags:true}, styleActiveLine:true,
+    extraKeys:{
+      'Ctrl-Enter':()=>applyChanges(), 'Cmd-Enter':()=>applyChanges(),
+      'Ctrl-S':()=>exportDocx(), 'Cmd-S':()=>exportDocx()
+    }
+  });
+  editor.on('change', () => {
+    if (!xmlModified) {
+      xmlModified=true;
+      document.getElementById('applyBar').classList.add('visible');
+      document.getElementById('statusDot').className='status-dot warning';
+      document.getElementById('statusText').textContent='XML 已修改';
+    }
+    // Auto-preview debounce
+    if (document.getElementById('autoPreviewToggle').checked) {
+      document.getElementById('debounceIndicator').classList.add('active');
+      clearTimeout(autoPreviewTimer);
+      autoPreviewTimer = setTimeout(async () => {
+        document.getElementById('debounceIndicator').classList.remove('active');
+        await applyChanges();
+      }, 800);
+    }
+  });
+  editor.on('cursorActivity', () => {
+    const pos=editor.getCursor();
+    document.getElementById('cursorPos').textContent=`行 ${pos.line+1}, 列 ${pos.ch+1}`;
+    highlightPreviewFromEditor();
+  });
+  const cmEl = editor.getWrapperElement();
+  cmEl.addEventListener('mouseover', handleEditorHover);
+  cmEl.addEventListener('mouseout', handleEditorHoverOut);
+  updateXmlSize();
+  editor.on('change', updateXmlSize);
+  setTimeout(()=>editor.refresh(),100);
+}
+
+function updateXmlSize() {
+  if (!editor) return;
+  document.getElementById('xmlSize').textContent = `${editor.lineCount()} 行 | ${(editor.getValue().length/1024).toFixed(1)} KB`;
+}
+
+// =====================================================================
+// OOXML Tooltip
+// =====================================================================
+function handleEditorHover(e) {
+  const coords = editor.coordsChar({left:e.clientX,top:e.clientY});
+  if (!coords) return;
+  const token = editor.getTokenAt(coords);
+  const line = editor.getLine(coords.line);
+  let tagName=null, attrName=null;
+  if (token.type==='tag'||token.type==='xml-tag') {
+    const m = token.string.match(/<\/?(\w+:\w+|\w+)/);
+    if (m) tagName = m[1].includes(':') ? m[1] : `w:${m[1]}`;
+  } else if (token.type==='attribute'||token.type==='xml-attribute-name') {
+    attrName = token.string;
+    const lb = line.substring(0,token.start);
+    const tm = lb.match(/<\/?(\w+:\w+|\w+)/g);
+    if (tm) tagName = tm[tm.length-1].replace(/[<\/]/g,'');
+  }
+  if (tagName && OOXML_SPEC[tagName]) showTooltip(e.clientX, e.clientY, tagName, attrName);
+  else if (tagName) showTooltip(e.clientX, e.clientY, tagName, attrName, true);
+}
+function handleEditorHoverOut() { hideTooltip(); clearPreviewHighlight(); }
+
+function showTooltip(x,y,tagName,attrName,isUnknown=false) {
+  const tip = document.getElementById('ooxmlTooltip');
+  const spec = OOXML_SPEC[tagName];
+  let html = `<div class="tag-name">&lt;${tagName}&gt;</div>`;
+  if (isUnknown) {
+    html += `<div class="tag-desc" style="color:var(--text-muted)">未在规范库中找到<br><span style="font-size:10px">参考: ECMA-376 Part 1</span></div>`;
+  } else {
+    html += `<div class="tag-desc">${spec.desc}</div>`;
+    if (attrName && spec.attrs && spec.attrs[attrName]) {
+      html += `<div class="tag-attrs"><div class="attr-row"><span class="attr-name">${attrName}</span><span class="attr-desc">${spec.attrs[attrName]}</span></div></div>`;
+    } else if (spec.attrs) {
+      html += '<div class="tag-attrs">';
+      Object.entries(spec.attrs).slice(0,4).forEach(([n,d])=>{
+        html += `<div class="attr-row"><span class="attr-name">${n}</span><span class="attr-desc">${d}</span></div>`;
+      });
+      html += '</div>';
+    }
+    html += `<div class="spec-link">§ ${spec.spec}</div>`;
+  }
+  tip.innerHTML=html; tip.classList.add('visible');
+  const rect=tip.getBoundingClientRect();
+  let left=x+12, top=y+12;
+  if (left+rect.width>window.innerWidth) left=x-rect.width-12;
+  if (top+rect.height>window.innerHeight) top=y-rect.height-12;
+  tip.style.left=left+'px'; tip.style.top=top+'px';
+}
+function hideTooltip() { document.getElementById('ooxmlTooltip').classList.remove('visible'); }
+
+// =====================================================================
+// 预览 ↔ 编辑器 高亮联动
+// =====================================================================
+function highlightPreviewFromEditor() {
+  if (!editor) return;
+  const preview = document.getElementById('docPreview');
+  if (!preview||preview.style.display==='none') return;
+  const cursor = editor.getCursor();
+  const lines = editor.getValue().split('\n');
+  let pCount=0;
+  for (let i=0;i<=cursor.line;i++) {
+    if (lines[i].includes('<w:p ')||lines[i].includes('<w:p>')) pCount++;
+  }
+  clearPreviewHighlight();
+  const elements = preview.querySelectorAll('[data-ooxml-type]');
+  if (pCount>0&&pCount<=elements.length) elements[pCount-1].classList.add('xml-highlight-hover');
+}
+function clearPreviewHighlight() {
+  const p=document.getElementById('docPreview');
+  if(!p) return;
+  p.querySelectorAll('.xml-highlight,.xml-highlight-hover').forEach(el=>el.classList.remove('xml-highlight','xml-highlight-hover'));
+}
+function clearEditorActiveHighlight() {
+  if (!editor) return;
+  for (let i=0;i<editor.lineCount();i++) editor.removeLineClass(i,'background','cm-xml-highlight-active');
+}
+function clearPreviewActiveHighlight() {
+  const p=document.getElementById('docPreview');
+  if(!p) return;
+  p.querySelectorAll('.xml-highlight-active').forEach(el=>el.classList.remove('xml-highlight-active'));
+}
+
+function jumpToXmlFromPreview(el) {
+  if (!editor||!el) return;
+  const preview=document.getElementById('docPreview');
+  const index=Array.from(preview.querySelectorAll('[data-ooxml-type]')).indexOf(el);
+  if (index<0) return;
+  clearEditorActiveHighlight(); clearPreviewActiveHighlight();
+  const lines=editor.getValue().split('\n');
+  let pCount=0, startLine=-1, endLine=-1;
+  for (let i=0;i<lines.length;i++) {
+    if (lines[i].includes('<w:p ')||lines[i].includes('<w:p>')) {
+      pCount++;
+      if (pCount===index+1) {
+        startLine=i;
+        for (let j=i+1;j<lines.length;j++) { if(lines[j].includes('</w:p>')){endLine=j;break;} }
+        if(endLine===-1) endLine=i;
+        break;
+      }
+    }
+  }
+  if (startLine===-1) return;
+  for (let i=startLine;i<=endLine;i++) editor.addLineClass(i,'background','cm-xml-highlight-active');
+  const lineTop=editor.charCoords({line:startLine,ch:0},'local').top;
+  const editorH=editor.getScrollerElement().clientHeight;
+  editor.scrollTo(null,Math.max(0,lineTop-editorH/2));
+  editor.setCursor({line:startLine,ch:0}); editor.focus();
+  el.classList.add('xml-highlight-active');
+}
+
+// =====================================================================
+// 应用修改
+// =====================================================================
+async function applyChanges() {
+  if (!editor||!docxZip) return;
+  try {
+    document.getElementById('statusText').textContent='应用中...';
+    let newXml=editor.getValue();
+    const parser=new DOMParser();
+    const doc=parser.parseFromString(newXml,'application/xml');
+    const err=doc.querySelector('parsererror');
+    if (err) throw new Error('XML 格式错误: '+err.textContent.substring(0,80));
+    newXml=new XMLSerializer().serializeToString(doc);
+    docxZip.file('word/document.xml', newXml);
+    originalXml=newXml;
+    await renderPreview();
+    xmlModified=false;
+    document.getElementById('applyBar').classList.remove('visible');
+    document.getElementById('statusDot').className='status-dot';
+    document.getElementById('statusText').textContent='修改已应用';
+    if (currentMode==='form') buildFieldForm();
+  } catch(error) {
+    showToast(`应用失败: ${error.message}`, 'error');
+    document.getElementById('statusDot').className='status-dot error';
+    document.getElementById('statusText').textContent='应用失败';
+  }
+}
+
+// =====================================================================
+// 导出 DOCX
+// =====================================================================
+async function exportDocx() {
+  if (!docxZip) return;
+  try {
+    if (xmlModified) await applyChanges();
+    const blob=await docxZip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE',compressionOptions:{level:6}});
+    const baseName=(document.getElementById('fileName').textContent||'document').replace(/\.docx$/i,'');
+    saveAs(blob,`${baseName}_edited.docx`);
+    showToast('DOCX 已导出', 'success');
+  } catch(error) { showToast(`导出失败: ${error.message}`, 'error'); }
+}
+
+// =====================================================================
+// 模式切换
+// =====================================================================
+let currentMode = 'editor';
+function switchMode(mode) {
+  if (mode==='batch'||mode==='diff') return; // handled by modal
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach(t=>t.classList.toggle('active', t.dataset.mode===mode));
+  const editorContainer = document.getElementById('editorContainer');
+  const formPanel = document.getElementById('formPanel');
+  const applyBar = document.getElementById('applyBar');
+  const autoPreviewWrap = document.getElementById('autoPreviewWrap');
+  if (mode==='editor') {
+    editorContainer.style.display='';
+    formPanel.classList.remove('visible');
+    applyBar.style.display=xmlModified?'flex':'none';
+    autoPreviewWrap.style.display='';
+    document.getElementById('rightPanelTitle').textContent='document.xml';
+    if (editor) setTimeout(()=>editor.refresh(),50);
+  } else if (mode==='form') {
+    editorContainer.style.display='none';
+    formPanel.classList.add('visible');
+    applyBar.style.display='none';
+    autoPreviewWrap.style.display='none';
+    document.getElementById('rightPanelTitle').textContent='字段表单';
+    buildFieldForm();
+  }
+}
+
+// =====================================================================
+// 字段表单
+// =====================================================================
+function buildFieldForm() {
+  const formEmpty = document.getElementById('formEmpty');
+  const formContent = document.getElementById('formContent');
+  const fieldInputs = document.getElementById('fieldInputs');
+  if (!docxZip || detectedFields.length===0) {
+    formEmpty.style.display='flex'; formContent.style.display='none'; return;
+  }
+  formEmpty.style.display='none'; formContent.style.display='block';
+  fieldInputs.innerHTML='';
+  detectedFields.forEach(field => {
+    const row=document.createElement('div'); row.className='field-input-row';
+    row.innerHTML=`
+      <div class="field-input-label">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--accent-green)"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        ${field.name}
+        <span class="field-pattern">${field.fullMatch}</span>
+      </div>
+      <input type="text" class="field-input-box" id="finput_${field.name}" placeholder="输入 ${field.name} 的值..." data-field="${field.name}">
+    `;
+    fieldInputs.appendChild(row);
+  });
+}
+
+function getFormValues() {
+  const values = {};
+  document.querySelectorAll('.field-input-box').forEach(input => {
+    values[input.dataset.field] = input.value;
+  });
+  return values;
+}
+
+// =====================================================================
+// 占位符替换引擎（增强版：支持跨 w:t 节点）
+// =====================================================================
+
+/**
+ * Word 的最大坑：一个占位符如 {{company_name}} 可能被 Word 拆成多个 w:t 节点：
+ *   <w:r><w:t>{{comp</w:t></w:r><w:r><w:t>any_name}}</w:t></w:r>
+ * 简单的字符串 replace 会失败。此算法在 XML DOM 层面操作，先合并同一段落内
+ * 所有 w:t 的文本，找到占位符位置，再回写修改对应的 w:t 节点。
+ */
+
+const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+
+/**
+ * 增强版：跨 w:t 节点的占位符替换
+ * @param {string} xmlString - OOXML document.xml 字符串
+ * @param {Object} mapping - { 字段名: 替换值 }
+ * @returns {string} 替换后的 XML 字符串
+ */
+function applyMappingToXml(xmlString, mapping) {
+  if (!mapping || !Object.keys(mapping).length) return xmlString;
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(xmlString, 'application/xml');
+
+  // 检查解析错误
+  if (doc.querySelector('parsererror')) {
+    // 回退到简单字符串替换
+    console.warn('XML 解析失败，回退到简单替换');
+    return applyMappingSimple(xmlString, mapping);
+  }
+
+  // 找到所有 w:p 段落
+  const paragraphs = doc.getElementsByTagNameNS(W_NS, 'p');
+  let replaced = 0;
+
+  for (let pi = 0; pi < paragraphs.length; pi++) {
+    const para = paragraphs[pi];
+
+    // 收集此段落中所有 w:r > w:t 的文本节点信息
+    const textEntries = [];
+    const runs = para.getElementsByTagNameNS(W_NS, 'r');
+    for (let ri = 0; ri < runs.length; ri++) {
+      const texts = runs[ri].getElementsByTagNameNS(W_NS, 't');
+      for (let ti = 0; ti < texts.length; ti++) {
+        const tNode = texts[ti];
+        // w:t 可能有 xml:space="preserve" 属性，需要保留
+        const textContent = tNode.textContent || '';
+        if (textContent.length > 0) {
+          textEntries.push({
+            node: tNode,
+            text: textContent,
+            run: runs[ri],
+            // 计算在合并文本中的偏移
+            offset: -1 // 稍后填充
+          });
+        }
+      }
+    }
+
+    if (textEntries.length === 0) continue;
+
+    // 计算偏移
+    let currentOffset = 0;
+    for (const entry of textEntries) {
+      entry.offset = currentOffset;
+      currentOffset += entry.text.length;
+    }
+    const mergedText = textEntries.map(e => e.text).join('');
+
+    // 在合并文本中查找所有占位符
+    let hasReplacement = false;
+    const replacements = []; // { start, end, value }
+
+    for (const [field, value] of Object.entries(mapping)) {
+      const strVal = String(value ?? '');
+      // 支持多种占位符格式
+      const patterns = [
+        `{{${field}}}`,
+        `{{ ${field} }}`,
+        `\${${field}}`,
+        `[${field}]`,
+        `#${field}#`,
+      ];
+      for (const pattern of patterns) {
+        let searchFrom = 0;
+        let idx;
+        while ((idx = mergedText.indexOf(pattern, searchFrom)) !== -1) {
+          replacements.push({ start: idx, end: idx + pattern.length, value: strVal });
+          searchFrom = idx + pattern.length;
+          hasReplacement = true;
+        }
+      }
+    }
+
+    if (!hasReplacement) continue;
+
+    // 按位置排序（从后往前替换，避免偏移变化）
+    replacements.sort((a, b) => a.start - b.start);
+
+    // 构建新的合并文本
+    let newMerged = '';
+    let lastEnd = 0;
+    for (const rep of replacements) {
+      newMerged += mergedText.substring(lastEnd, rep.start);
+      newMerged += rep.value;
+      lastEnd = rep.end;
+    }
+    newMerged += mergedText.substring(lastEnd);
+
+    // 将新文本分配回 w:t 节点
+    distributeTextToNodes(textEntries, newMerged);
+    replaced++;
+  }
+
+  if (replaced === 0) {
+    // 没有找到跨节点的占位符，回退到简单替换
+    return applyMappingSimple(xmlString, mapping);
+  }
+
+  // 序列化回 XML 字符串
+  const serializer = new XMLSerializer();
+  let result = serializer.serializeToString(doc);
+
+  // XMLSerializer 可能会添加命名空间声明，清理一下
+  result = result.replace(/\s+xmlns:xmlns="[^"]*"/g, '');
+
+  return result;
+}
+
+/**
+ * 将新文本合理分配回原有的 w:t 节点
+ * 策略：把所有文本放到第一个 w:t 节点，清空其余节点
+ * （最安全的方式，避免 Word 解析问题）
+ */
+function distributeTextToNodes(textEntries, newText) {
+  if (textEntries.length === 0) return;
+
+  // 全部文本放入第一个节点
+  textEntries[0].node.textContent = newText;
+
+  // 清空其余节点
+  for (let i = 1; i < textEntries.length; i++) {
+    textEntries[i].node.textContent = '';
+  }
+}
+
+/**
+ * 简单字符串替换（回退方案）
+ */
+function applyMappingSimple(xmlString, mapping) {
+  let result = xmlString;
+  for (const [field, value] of Object.entries(mapping)) {
+    const strVal = String(value ?? '');
+    const escaped = escapeXml(strVal);
+    const patterns = [
+      new RegExp(`\\{\\{\\s*${escapeRegExp(field)}\\s*\\}\\}`, 'g'),
+      new RegExp(`\\$\\{${escapeRegExp(field)}\\}`, 'g'),
+      new RegExp(`\\[${escapeRegExp(field)}\\]`, 'g'),
+      new RegExp(`#${escapeRegExp(field)}#`, 'g'),
+    ];
+    for (const p of patterns) {
+      result = result.replace(p, escaped);
+    }
+  }
+  return result;
+}
+
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+/**
+ * 从模板 XML 中检测所有占位符字段
+ * 同时处理跨 w:t 节点的情况
+ */
+function detectFieldsFromTemplate() {
+  if (Array.isArray(detectedFields) && detectedFields.length) return detectedFields;
+
+  const fieldSet = new Set();
+
+  // 方法1：简单正则扫描（快速路径）
+  const re = /\{\{\s*([^{}]+?)\s*\}\}/g;
+  let m;
+  while ((m = re.exec(originalXml)) !== null) {
+    fieldSet.add(m[1].trim());
+  }
+
+  // 方法2：DOM 级别扫描（捕获跨节点占位符）
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(originalXml, 'application/xml');
+    if (!doc.querySelector('parsererror')) {
+      const paragraphs = doc.getElementsByTagNameNS(W_NS, 'p');
+      for (let pi = 0; pi < paragraphs.length; pi++) {
+        const runs = paragraphs[pi].getElementsByTagNameNS(W_NS, 'r');
+        let merged = '';
+        for (let ri = 0; ri < runs.length; ri++) {
+          const texts = runs[ri].getElementsByTagNameNS(W_NS, 't');
+          for (let ti = 0; ti < texts.length; ti++) {
+            merged += texts[ti].textContent || '';
+          }
+        }
+        // 在合并文本中查找占位符
+        const re2 = /\{\{\s*([^{}]+?)\s*\}\}/g;
+        let m2;
+        while ((m2 = re2.exec(merged)) !== null) {
+          fieldSet.add(m2[1].trim());
+        }
+      }
+    }
+  } catch (e) {
+    // DOM 解析失败，仅使用方法1的结果
+  }
+
+  detectedFields = [...fieldSet].map(name => ({ name, fullMatch: `{{${name}}}` }));
+  return detectedFields;
+}
+
+/**
+ * 兼容旧接口：applyFormValues 内部调用增强版引擎
+ */
+function applyFormValues(xml, values) {
+  return applyMappingToXml(xml, values);
+}
+
+function escapeXml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+async function applyFormAndPreview() {
+  if (!docxZip) { showToast('请先加载 DOCX 文件', 'error'); return; }
+  const values = getFormValues();
+  const filled = Object.values(values).some(v=>v.trim());
+  if (!filled) { showToast('请至少填写一个字段', 'info'); return; }
+  const newXml = applyFormValues(originalXml, values);
+  const tempZip = await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
+  tempZip.file('word/document.xml', newXml);
+  // Temporarily swap and render
+  const savedZip = docxZip;
+  const savedXml = originalXml;
+  docxZip = tempZip; originalXml = newXml;
+  await renderPreview();
+  docxZip = savedZip; originalXml = savedXml;
+  showToast('预览已更新（XML 未修改）', 'success');
+}
+
+async function applyFormAndExport() {
+  if (!docxZip) { showToast('请先加载 DOCX 文件', 'error'); return; }
+  const values = getFormValues();
+  const newXml = applyFormValues(originalXml, values);
+  const exportZip = await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
+  exportZip.file('word/document.xml', newXml);
+  const blob = await exportZip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',compression:'DEFLATE',compressionOptions:{level:6}});
+  const baseName=(document.getElementById('fileName').textContent||'document').replace(/\.docx$/i,'');
+  saveAs(blob, `${baseName}_filled.docx`);
+  showToast('已导出填写后的文档', 'success');
+}
+
+// =====================================================================
+// 批量生成
+// =====================================================================
+function openBatchModal() {
+  if (!docxZip) { showToast('请先加载模板 DOCX 文件', 'error'); return; }
+  detectFieldsFromTemplate();
+  batchCurrentStep=1;
+  batchMapping={};
+  batchResultLog=[];
+  batchRunning=false;
+  batchFilenameTemplate=document.getElementById('filenameTemplate')?.value||'文档_{{index}}';
+  document.getElementById('batchReadyMsg').textContent='请先上传 CSV/JSON 数据文件';
+  document.getElementById('batchProgressWrap').style.display='none';
+  document.getElementById('batchModal').classList.add('visible');
+  renderBatchStep();
+}
+function closeBatchModal() { document.getElementById('batchModal').classList.remove('visible'); }
+
+function renderBatchStep() {
+  for (let i=1;i<=3;i++) {
+    document.getElementById(`bstep${i}`).classList.toggle('active',i===batchCurrentStep);
+    const el=document.getElementById(`batchStep${i}`);
+    if(el) el.style.display=i===batchCurrentStep?'block':'none';
+  }
+  document.getElementById('batchPrevBtn').style.display=batchCurrentStep>1?'inline-flex':'none';
+  const nextBtn=document.getElementById('batchNextBtn');
+  if (batchCurrentStep===3) { nextBtn.textContent=batchRunning?'生成中...':'生成 ZIP 下载'; nextBtn.className='btn btn-green'; }
+  else { nextBtn.textContent='下一步'; nextBtn.className='btn btn-green'; }
+}
+
+function batchStepNext() {
+  if (batchRunning) return;
+  if (batchCurrentStep===1) {
+    if (!batchData.rows.length) { showToast('请先上传数据', 'error'); return; }
+    buildMappingUI();
+    batchCurrentStep=2;
+  } else if (batchCurrentStep===2) {
+    const mappings=getMappings();
+    if (!Object.keys(mappings).length) { showToast('请至少映射一个字段', 'error'); return; }
+    batchFilenameTemplate=document.getElementById('filenameTemplate')?.value||'文档_{{index}}';
+    const rowCount=batchData.rows.length;
+    document.getElementById('batchReadyMsg').innerHTML=
+      `准备生成 <strong style="color:var(--accent-green);font-size:20px">${rowCount}</strong> 份文档<br>
+      <span style="font-size:12px;color:var(--text-muted);margin-top:6px;display:block">文件名模板: ${batchFilenameTemplate}</span>`;
+    document.getElementById('batchProgressWrap').style.display='none';
+    batchCurrentStep=3;
+  } else if (batchCurrentStep===3) {
+    generateBatchDocuments();
+    return;
+  }
+  renderBatchStep();
+}
+
+function batchStepPrev() {
+  if (batchRunning) return;
+  if (batchCurrentStep>1) { batchCurrentStep--; renderBatchStep(); }
+}
+
+function buildMappingUI() {
+  const container=document.getElementById('mappingRows');
+  container.innerHTML='';
+  detectedFields.forEach(field => {
+    const row=document.createElement('div'); row.className='mapping-row';
+    let optionsHtml=`<option value="">-- 不映射 --</option>`;
+    batchData.headers.forEach(h=>{
+      const selected = h.toLowerCase()===field.name.toLowerCase()||h===field.name?'selected':'';
+      optionsHtml+=`<option value="${h}" ${selected}>${h}</option>`;
+    });
+    row.innerHTML=`
+      <span class="mapping-field">{{${field.name}}}</span>
+      <span class="mapping-arrow">→</span>
+      <select class="mapping-select" id="mapping_${field.name}">${optionsHtml}</select>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function getMappings() {
+  const m={};
+  detectedFields.forEach(field=>{
+    const sel=document.getElementById(`mapping_${field.name}`);
+    if(sel&&sel.value) m[field.name]=sel.value;
+  });
+  batchMapping=m;
+  return m;
+}
+
+async function generateBatchDocuments() {
+  const mappings=getMappings();
+  if (!Object.keys(mappings).length) { showToast('请先完成字段映射', 'error'); return; }
+  const filenameTpl=document.getElementById('filenameTemplate').value||'文档_{{index}}';
+  const rows=batchData.rows;
+  const nextBtn=document.getElementById('batchNextBtn');
+  nextBtn.disabled=true; nextBtn.textContent='生成中...';
+  batchRunning=true;
+  const progressWrap=document.getElementById('batchProgressWrap');
+  const progressFill=document.getElementById('batchProgressFill');
+  const progressText=document.getElementById('batchProgressText');
+  progressWrap.style.display='block';
+  const outZip=new JSZip();
+  const baseXml=originalXml;
+  batchResultLog=[];
+  for (let i=0;i<rows.length;i++) {
+    const row=rows[i];
+    try {
+      // 使用增强版替换引擎（支持跨 w:t 节点）
+      const xml=applyMappingToXml(baseXml, mappings);
+      // Generate filename
+      let fname=filenameTpl.replace(/\{\{\s*index\s*\}\}/g,String(i+1));
+      fname=fname.replace(/\{\{\s*([^{}]+?)\s*\}\}/g,(_,key)=>{
+        const v=row[key]; return (v===undefined||v===null)?'':String(v);
+      });
+      fname=fname.replace(/[\\/:*?"<>|]/g,'_');
+      if(!fname.toLowerCase().endsWith('.docx')) fname+='.docx';
+      const docZip=await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
+      docZip.file('word/document.xml',xml);
+      const blob=await docZip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+      outZip.file(fname,blob);
+      batchResultLog.push({index:i+1,ok:true,filename:fname,message:'success'});
+    } catch(err) {
+      batchResultLog.push({index:i+1,ok:false,filename:'',message:err.message||'unknown'});
+    }
+    const pct=Math.round((i+1)/rows.length*100);
+    progressFill.style.width=pct+'%';
+    progressText.textContent=`${i+1} / ${rows.length}`;
+    await new Promise(r=>setTimeout(r,0)); // yield to UI
+  }
+  // 附带生成报告
+  const report=['index,status,filename,message']
+    .concat(batchResultLog.map(r=>
+      `${r.index},${r.ok?'OK':'FAIL'},"${(r.filename||'').replace(/"/g,'""')}","${(r.message||'').replace(/"/g,'""')}"`
+    )).join('\n');
+  outZip.file('report.csv',report);
+  const zipBlob=await outZip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+  const baseName=(document.getElementById('fileName')?.textContent||'template').replace(/\.docx$/i,'');
+  saveAs(zipBlob,`${baseName}_批量_${rows.length}份.zip`);
+  const okCount=batchResultLog.filter(x=>x.ok).length;
+  showToast(`批量生成完成：成功 ${okCount}/${rows.length}`, okCount===rows.length?'success':'info');
+  nextBtn.disabled=false; nextBtn.textContent='重新生成';
+  batchRunning=false;
+}
+
+// CSV / JSON 解析
+function parseCSV(text) {
+  const lines=text.trim().split('\n').filter(l=>l.trim());
+  if(!lines.length) return {headers:[],rows:[]};
+  function parseLine(line) {
+    const result=[]; let inQ=false, val='';
+    for (let i=0;i<line.length;i++) {
+      if(line[i]==='"'){inQ=!inQ;}
+      else if(line[i]===','&&!inQ){result.push(val.trim());val='';}
+      else{val+=line[i];}
+    }
+    result.push(val.trim()); return result;
+  }
+  const headers=parseLine(lines[0]).map(h=>h.replace(/^"|"$/g,''));
+  const rows=lines.slice(1).map(l=>{
+    const vals=parseLine(l);
+    return Object.fromEntries(headers.map((h,i)=>[h,(vals[i]||'').replace(/^"|"$/g,'')]));
+  });
+  return {headers,rows};
+}
+
+function loadDataIntoUI(data) {
+  batchData=data;
+  document.getElementById('dataRowCount').textContent=`共 ${data.rows.length} 行数据`;
+  document.getElementById('dataPreviewWrap').style.display='block';
+  const table=document.getElementById('dataPreviewTable');
+  let html=`<thead><tr>${data.headers.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>`;
+  data.rows.slice(0,5).forEach(row=>{
+    html+=`<tr>${data.headers.map(h=>`<td>${escapeHtml(row[h]||'')}</td>`).join('')}</tr>`;
+  });
+  html+='</tbody>'; table.innerHTML=html;
+  showToast(`已载入 ${data.rows.length} 行数据`, 'success');
+}
+
+function loadManualJson() {
+  try {
+    const text=document.getElementById('manualJsonInput').value.trim();
+    const arr=JSON.parse(text);
+    if(!Array.isArray(arr)||!arr.length) throw new Error('需要非空数组');
+    const headers=Object.keys(arr[0]);
+    loadDataIntoUI({headers,rows:arr});
+  } catch(e) { showToast(`JSON 解析失败: ${e.message}`, 'error'); }
+}
+
+// =====================================================================
+// 文档对比 (Diff)
+// =====================================================================
+function openDiffModal() {
+  document.getElementById('diffModal').classList.add('visible');
+  if (originalXml) {
+    renderDiffPane1(originalXml);
+    if (diffXml2) runDiff();
+  }
+}
+function closeDiffModal() { document.getElementById('diffModal').classList.remove('visible'); }
+
+async function loadDiffDocx(event) {
+  const file=event.target.files[0];
+  if (!file) return;
+  try {
+    const ab=await file.arrayBuffer();
+    const z=await JSZip.loadAsync(ab);
+    const f=z.file('word/document.xml');
+    if(!f) throw new Error('无效 DOCX');
+    diffXml2=await f.async('string');
+    try {
+      const doc=new DOMParser().parseFromString(diffXml2,'application/xml');
+      diffXml2=formatXml(new XMLSerializer().serializeToString(doc));
+    } catch(e){}
+    document.getElementById('diffPane2Title').textContent=file.name;
+    runDiff();
+  } catch(e) { showToast(`加载失败: ${e.message}`, 'error'); }
+}
+
+function renderDiffPane1(xml) {
+  let fmtXml=xml;
+  try {
+    const doc=new DOMParser().parseFromString(xml,'application/xml');
+    fmtXml=formatXml(new XMLSerializer().serializeToString(doc));
+  } catch(e){}
+  const lines=fmtXml.split('\n');
+  document.getElementById('diffPane1Lines').textContent=`${lines.length} 行`;
+  const c=document.getElementById('diffContent1');
+  c.innerHTML=lines.map((l,i)=>`<div class="diff-line"><span class="diff-line-num">${i+1}</span><span class="diff-line-text">${escapeHtml(l)}</span></div>`).join('');
+}
+
+function runDiff() {
+  if (!originalXml||!diffXml2) return;
+  let xml1=originalXml;
+  try { xml1=formatXml(new XMLSerializer().serializeToString(new DOMParser().parseFromString(xml1,'application/xml'))); } catch(e){}
+  const lines1=xml1.split('\n');
+  const lines2=diffXml2.split('\n');
+  renderDiffPane1(originalXml);
+
+  // Simple LCS-based diff
+  const diff=computeLineDiff(lines1, lines2);
+  let addCount=0, remCount=0, chgCount=0;
+  const c2=document.getElementById('diffContent2');
+  let html2='';
+  let lineNum2=0;
+  diff.forEach(op=>{
+    if(op.type==='same'){
+      lineNum2++;
+      html2+=`<div class="diff-line"><span class="diff-line-num">${lineNum2}</span><span class="diff-line-text">${escapeHtml(op.line)}</span></div>`;
+    } else if(op.type==='added'){
+      lineNum2++; addCount++;
+      html2+=`<div class="diff-line diff-added"><span class="diff-line-num">+${lineNum2}</span><span class="diff-line-text">${escapeHtml(op.line)}</span></div>`;
+    } else if(op.type==='removed'){
+      remCount++;
+      html2+=`<div class="diff-line diff-removed"><span class="diff-line-num">-</span><span class="diff-line-text">${escapeHtml(op.line)}</span></div>`;
+    }
+  });
+  c2.innerHTML=html2;
+  document.getElementById('diffPane2Lines').textContent=`${lines2.length} 行`;
+  document.getElementById('diffStats').innerHTML=
+    `<span class="diff-stat-add">+${addCount} 行</span>
+     <span class="diff-stat-rem">-${remCount} 行</span>`;
+}
+
+function computeLineDiff(a, b) {
+  // Simple patience-like diff using LCS
+  const m=a.length, n=b.length;
+  // For large files, limit to chunk-based diff
+  if (m>2000||n>2000) return simpleChunkDiff(a,b);
+  const dp=Array.from({length:m+1},()=>new Array(n+1).fill(0));
+  for(let i=m-1;i>=0;i--) for(let j=n-1;j>=0;j--) {
+    dp[i][j]=a[i]===b[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  }
+  const result=[];
+  let i=0,j=0;
+  while(i<m&&j<n){
+    if(a[i]===b[j]){result.push({type:'same',line:b[j]});i++;j++;}
+    else if(dp[i+1][j]>=dp[i][j+1]){result.push({type:'removed',line:a[i]});i++;}
+    else{result.push({type:'added',line:b[j]});j++;}
+  }
+  while(i<m){result.push({type:'removed',line:a[i]});i++;}
+  while(j<n){result.push({type:'added',line:b[j]});j++;}
+  return result;
+}
+
+function simpleChunkDiff(a,b) {
+  // Fallback: line-by-line comparison for large files
+  const result=[];
+  const maxLen=Math.max(a.length,b.length);
+  for(let i=0;i<maxLen;i++){
+    if(i>=a.length) result.push({type:'added',line:b[i]});
+    else if(i>=b.length) result.push({type:'removed',line:a[i]});
+    else if(a[i]===b[i]) result.push({type:'same',line:b[i]});
+    else { result.push({type:'removed',line:a[i]}); result.push({type:'added',line:b[i]}); }
+  }
+  return result;
+}
+
+// =====================================================================
+// 拖拽上传
+// =====================================================================
+function initDragDrop() {
+  ['dragenter','dragover','dragleave','drop'].forEach(ev=>document.body.addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();}));
+  document.body.addEventListener('dragenter',()=>document.getElementById('dropZone').classList.add('drag-over'));
+  document.body.addEventListener('dragleave',e=>{if(!e.relatedTarget||e.relatedTarget===document.documentElement) document.getElementById('dropZone').classList.remove('drag-over');});
+  document.body.addEventListener('drop',e=>{
+    document.getElementById('dropZone').classList.remove('drag-over');
+    const files=e.dataTransfer.files;
+    if(files.length>0&&files[0].name.endsWith('.docx')) loadDocx(files[0]);
+    else showToast('请拖拽 .docx 文件', 'error');
+  });
+  // Batch data drag drop
+  const ddz=document.getElementById('dataDropZone');
+  if(ddz){
+    ddz.addEventListener('dragover',e=>{e.preventDefault();ddz.classList.add('drag-over');});
+    ddz.addEventListener('dragleave',()=>ddz.classList.remove('drag-over'));
+    ddz.addEventListener('drop',e=>{e.preventDefault();ddz.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)handleDataFile(f);});
+  }
+}
+
+function handleDataFile(file) {
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try {
+      const text=e.target.result;
+      let data;
+      if(file.name.endsWith('.json')){
+        const arr=JSON.parse(text);
+        if(!Array.isArray(arr)||!arr.length) throw new Error('需要非空数组');
+        data={headers:Object.keys(arr[0]),rows:arr};
+      } else {
+        data=parseCSV(text);
+      }
+      if(!data.rows.length) throw new Error('数据为空');
+      loadDataIntoUI(data);
+    } catch(e) { showToast(`解析失败: ${e.message}`, 'error'); }
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+// =====================================================================
+// 预览元素悬停 / 点击
+// =====================================================================
+function initPreviewHover() {
+  const preview=document.getElementById('docPreview');
+  preview.addEventListener('mouseover',e=>{
+    const target=e.target.closest('[data-ooxml-type]');
+    if(!target||!editor) return;
+    const index=Array.from(preview.querySelectorAll('[data-ooxml-type]')).indexOf(target);
+    const lines=editor.getValue().split('\n');
+    let pCount=0;
+    for(let i=0;i<lines.length;i++){
+      if(lines[i].includes('<w:p ')||lines[i].includes('<w:p>')){
+        pCount++;
+        if(pCount===index+1){
+          editor.addLineClass(i,'background','cm-xml-highlight-line');
+          for(let j=i+1;j<lines.length;j++){editor.addLineClass(j,'background','cm-xml-highlight-line');if(lines[j].includes('</w:p>'))break;}
+          break;
+        }
+      }
+    }
+    target.classList.add('xml-highlight');
+  });
+  preview.addEventListener('mouseout',e=>{
+    const target=e.target.closest('[data-ooxml-type]');
+    if(!target) return;
+    target.classList.remove('xml-highlight');
+    if(editor){for(let i=0;i<editor.lineCount();i++)editor.removeLineClass(i,'background','cm-xml-highlight-line');}
+  });
+  preview.addEventListener('click',e=>{
+    const fieldEl=e.target.closest('.template-field');
+    if(fieldEl){navigateToField(fieldEl.getAttribute('data-field-name'));return;}
+    const target=e.target.closest('[data-ooxml-type]');
+    if(target) jumpToXmlFromPreview(target);
+  });
+  document.getElementById('btnFieldNav').addEventListener('click',e=>{e.stopPropagation();document.getElementById('fieldNavigator').classList.toggle('visible');});
+  document.addEventListener('click',e=>{const fn=document.getElementById('fieldNavigator');if(!fn.contains(e.target)&&e.target!==document.getElementById('btnFieldNav'))fn.classList.remove('visible');});
+}
+
+// =====================================================================
+// 面板拖拽调整
+// =====================================================================
+function initResize() {
+  const handle=document.getElementById('resizeHandle');
+  const pL=document.getElementById('panelLeft');
+  const pR=document.getElementById('panelRight');
+  const container=document.querySelector('.main-container');
+  let startX, startW;
+  handle.addEventListener('mousedown',e=>{
+    startX=e.clientX; startW=pL.offsetWidth;
+    handle.classList.add('active');
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onUp);
+    document.body.style.cssText+='cursor:col-resize;user-select:none;';
+  });
+  function onMove(e){
+    const pct=Math.max(20,Math.min(80,((startW+(e.clientX-startX))/container.offsetWidth)*100));
+    pL.style.flex=`0 0 ${pct}%`; pR.style.flex=`0 0 ${100-pct}%`;
+    if(editor) editor.refresh();
+  }
+  function onUp(){
+    handle.classList.remove('active');
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+    document.body.style.cursor=''; document.body.style.userSelect='';
+    if(editor) editor.refresh();
+  }
+}
+
+// =====================================================================
+// 键盘快捷键 & 按钮事件
+// =====================================================================
+function initEvents() {
+  document.getElementById('fileInput').addEventListener('change',e=>{const f=e.target.files[0];if(f)loadDocx(f);});
+  document.getElementById('csvInput').addEventListener('change',e=>{const f=e.target.files[0];if(f)handleDataFile(f);});
+  document.addEventListener('keydown',e=>{
+    if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();applyChanges();}
+    if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();exportDocx();}
+    if(e.key==='Escape'){closeBatchModal();closeDiffModal();}
+  });
+}
+
+// =====================================================================
+// 初始化
+// =====================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  initResize();
+  initDragDrop();
+  initEvents();
+  setTimeout(()=>initPreviewHover(), 200);
+  // Load mammoth.js
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+  s.onerror=()=>console.warn('mammoth.js 加载失败，使用内置解析器');
+  document.head.appendChild(s);
+});
+</script>
+</body>
+</html>
