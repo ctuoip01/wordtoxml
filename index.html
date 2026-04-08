@@ -296,6 +296,102 @@ body {
   .resize-handle { width:100%; height:4px; cursor:row-resize; }
   .doc-preview { padding:28px 20px; }
 }
+
+/* ===== Desktop Tool Download Button ===== */
+.btn-download-tool {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 1px solid var(--accent-green);
+  border-radius: 6px;
+  background: rgba(158,206,106,0.1);
+  color: var(--accent-green);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.btn-download-tool:hover {
+  background: rgba(158,206,106,0.2);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 12px rgba(158,206,106,0.15);
+}
+.btn-download-tool svg { width:14px; height:14px; }
+
+/* Download Tooltip Panel */
+.download-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+  padding: 16px;
+  z-index: 500;
+  display: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.download-tooltip.visible {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+.download-tooltip-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.download-tooltip-title svg { width:16px; height:16px; color:var(--accent-green); }
+.download-tooltip-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+.download-features {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 14px;
+}
+.download-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.download-feature-item svg { width:12px; height:12px; color:var(--accent-green); flex-shrink:0; }
+.download-tooltip-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+.download-tooltip-actions .btn { flex:1; justify-content:center; font-size:11px; }
+.download-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  background: rgba(158,206,106,0.15);
+  border-radius: 4px;
+  font-size: 10px;
+  color: var(--accent-green);
+  font-weight: 600;
+  margin-left: 4px;
+}
 </style>
 </head>
 <body>
@@ -344,10 +440,44 @@ body {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       导出 DOCX
     </button>
-    <button class="btn" onclick="openBatchModal()" title="批量生成文档">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><path d="M7 9h2m2 0h2m2 0h2"/></svg>
-      批量生成
-    </button>
+    <!-- 桌面工具下载按钮 -->
+    <div style="position:relative;" id="desktopToolWrap">
+      <button class="btn-download-tool" id="btnDesktopTool" onclick="toggleDownloadTooltip(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        桌面工具
+        <span class="download-badge">EXE</span>
+      </button>
+      <div class="download-tooltip" id="downloadTooltip">
+        <div class="download-tooltip-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Word 办公自动化工具
+        </div>
+        <div class="download-tooltip-desc">
+          本地离线运行的 Word 批量处理工具，无需联网，支持 7 大核心功能，一键批量操作。
+        </div>
+        <div class="download-features">
+          <div class="download-feature-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            批量替换 / 删除页眉页脚 / 空段落清理
+          </div>
+          <div class="download-feature-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            封面表格样式统一 / 表格压缩优化
+          </div>
+          <div class="download-feature-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            附件列表替换 / 批量重命名 / 转 PDF
+          </div>
+        </div>
+        <div class="download-tooltip-actions">
+          <a href="https://dl.word-xml.ccwu.cc/" class="btn btn-green" style="text-decoration:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            下载 EXE
+          </a>
+          <button class="btn" onclick="closeDownloadTooltip()">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -654,10 +784,6 @@ let autoPreviewTimer = null;
 // Batch state
 let batchData = { headers:[], rows:[] };
 let batchCurrentStep = 1;
-let batchMapping = {};
-let batchResultLog = [];
-let batchRunning = false;
-let batchFilenameTemplate = '文档_{{index}}';
 
 // Diff state
 let diffXml2 = '';
@@ -1180,228 +1306,19 @@ function getFormValues() {
   return values;
 }
 
-// =====================================================================
-// 占位符替换引擎（增强版：支持跨 w:t 节点）
-// =====================================================================
-
-/**
- * Word 的最大坑：一个占位符如 {{company_name}} 可能被 Word 拆成多个 w:t 节点：
- *   <w:r><w:t>{{comp</w:t></w:r><w:r><w:t>any_name}}</w:t></w:r>
- * 简单的字符串 replace 会失败。此算法在 XML DOM 层面操作，先合并同一段落内
- * 所有 w:t 的文本，找到占位符位置，再回写修改对应的 w:t 节点。
- */
-
-const W_NS = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-
-/**
- * 增强版：跨 w:t 节点的占位符替换
- * @param {string} xmlString - OOXML document.xml 字符串
- * @param {Object} mapping - { 字段名: 替换值 }
- * @returns {string} 替换后的 XML 字符串
- */
-function applyMappingToXml(xmlString, mapping) {
-  if (!mapping || !Object.keys(mapping).length) return xmlString;
-
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlString, 'application/xml');
-
-  // 检查解析错误
-  if (doc.querySelector('parsererror')) {
-    // 回退到简单字符串替换
-    console.warn('XML 解析失败，回退到简单替换');
-    return applyMappingSimple(xmlString, mapping);
-  }
-
-  // 找到所有 w:p 段落
-  const paragraphs = doc.getElementsByTagNameNS(W_NS, 'p');
-  let replaced = 0;
-
-  for (let pi = 0; pi < paragraphs.length; pi++) {
-    const para = paragraphs[pi];
-
-    // 收集此段落中所有 w:r > w:t 的文本节点信息
-    const textEntries = [];
-    const runs = para.getElementsByTagNameNS(W_NS, 'r');
-    for (let ri = 0; ri < runs.length; ri++) {
-      const texts = runs[ri].getElementsByTagNameNS(W_NS, 't');
-      for (let ti = 0; ti < texts.length; ti++) {
-        const tNode = texts[ti];
-        // w:t 可能有 xml:space="preserve" 属性，需要保留
-        const textContent = tNode.textContent || '';
-        if (textContent.length > 0) {
-          textEntries.push({
-            node: tNode,
-            text: textContent,
-            run: runs[ri],
-            // 计算在合并文本中的偏移
-            offset: -1 // 稍后填充
-          });
-        }
-      }
-    }
-
-    if (textEntries.length === 0) continue;
-
-    // 计算偏移
-    let currentOffset = 0;
-    for (const entry of textEntries) {
-      entry.offset = currentOffset;
-      currentOffset += entry.text.length;
-    }
-    const mergedText = textEntries.map(e => e.text).join('');
-
-    // 在合并文本中查找所有占位符
-    let hasReplacement = false;
-    const replacements = []; // { start, end, value }
-
-    for (const [field, value] of Object.entries(mapping)) {
-      const strVal = String(value ?? '');
-      // 支持多种占位符格式
-      const patterns = [
-        `{{${field}}}`,
-        `{{ ${field} }}`,
-        `\${${field}}`,
-        `[${field}]`,
-        `#${field}#`,
-      ];
-      for (const pattern of patterns) {
-        let searchFrom = 0;
-        let idx;
-        while ((idx = mergedText.indexOf(pattern, searchFrom)) !== -1) {
-          replacements.push({ start: idx, end: idx + pattern.length, value: strVal });
-          searchFrom = idx + pattern.length;
-          hasReplacement = true;
-        }
-      }
-    }
-
-    if (!hasReplacement) continue;
-
-    // 按位置排序（从后往前替换，避免偏移变化）
-    replacements.sort((a, b) => a.start - b.start);
-
-    // 构建新的合并文本
-    let newMerged = '';
-    let lastEnd = 0;
-    for (const rep of replacements) {
-      newMerged += mergedText.substring(lastEnd, rep.start);
-      newMerged += rep.value;
-      lastEnd = rep.end;
-    }
-    newMerged += mergedText.substring(lastEnd);
-
-    // 将新文本分配回 w:t 节点
-    distributeTextToNodes(textEntries, newMerged);
-    replaced++;
-  }
-
-  if (replaced === 0) {
-    // 没有找到跨节点的占位符，回退到简单替换
-    return applyMappingSimple(xmlString, mapping);
-  }
-
-  // 序列化回 XML 字符串
-  const serializer = new XMLSerializer();
-  let result = serializer.serializeToString(doc);
-
-  // XMLSerializer 可能会添加命名空间声明，清理一下
-  result = result.replace(/\s+xmlns:xmlns="[^"]*"/g, '');
-
-  return result;
-}
-
-/**
- * 将新文本合理分配回原有的 w:t 节点
- * 策略：把所有文本放到第一个 w:t 节点，清空其余节点
- * （最安全的方式，避免 Word 解析问题）
- */
-function distributeTextToNodes(textEntries, newText) {
-  if (textEntries.length === 0) return;
-
-  // 全部文本放入第一个节点
-  textEntries[0].node.textContent = newText;
-
-  // 清空其余节点
-  for (let i = 1; i < textEntries.length; i++) {
-    textEntries[i].node.textContent = '';
-  }
-}
-
-/**
- * 简单字符串替换（回退方案）
- */
-function applyMappingSimple(xmlString, mapping) {
-  let result = xmlString;
-  for (const [field, value] of Object.entries(mapping)) {
-    const strVal = String(value ?? '');
-    const escaped = escapeXml(strVal);
-    const patterns = [
-      new RegExp(`\\{\\{\\s*${escapeRegExp(field)}\\s*\\}\\}`, 'g'),
-      new RegExp(`\\$\\{${escapeRegExp(field)}\\}`, 'g'),
-      new RegExp(`\\[${escapeRegExp(field)}\\]`, 'g'),
-      new RegExp(`#${escapeRegExp(field)}#`, 'g'),
-    ];
-    for (const p of patterns) {
-      result = result.replace(p, escaped);
-    }
-  }
-  return result;
-}
-
-function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-
-/**
- * 从模板 XML 中检测所有占位符字段
- * 同时处理跨 w:t 节点的情况
- */
-function detectFieldsFromTemplate() {
-  if (Array.isArray(detectedFields) && detectedFields.length) return detectedFields;
-
-  const fieldSet = new Set();
-
-  // 方法1：简单正则扫描（快速路径）
-  const re = /\{\{\s*([^{}]+?)\s*\}\}/g;
-  let m;
-  while ((m = re.exec(originalXml)) !== null) {
-    fieldSet.add(m[1].trim());
-  }
-
-  // 方法2：DOM 级别扫描（捕获跨节点占位符）
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(originalXml, 'application/xml');
-    if (!doc.querySelector('parsererror')) {
-      const paragraphs = doc.getElementsByTagNameNS(W_NS, 'p');
-      for (let pi = 0; pi < paragraphs.length; pi++) {
-        const runs = paragraphs[pi].getElementsByTagNameNS(W_NS, 'r');
-        let merged = '';
-        for (let ri = 0; ri < runs.length; ri++) {
-          const texts = runs[ri].getElementsByTagNameNS(W_NS, 't');
-          for (let ti = 0; ti < texts.length; ti++) {
-            merged += texts[ti].textContent || '';
-          }
-        }
-        // 在合并文本中查找占位符
-        const re2 = /\{\{\s*([^{}]+?)\s*\}\}/g;
-        let m2;
-        while ((m2 = re2.exec(merged)) !== null) {
-          fieldSet.add(m2[1].trim());
-        }
-      }
-    }
-  } catch (e) {
-    // DOM 解析失败，仅使用方法1的结果
-  }
-
-  detectedFields = [...fieldSet].map(name => ({ name, fullMatch: `{{${name}}}` }));
-  return detectedFields;
-}
-
-/**
- * 兼容旧接口：applyFormValues 内部调用增强版引擎
- */
 function applyFormValues(xml, values) {
-  return applyMappingToXml(xml, values);
+  let result = xml;
+  for (const [field, value] of Object.entries(values)) {
+    if (!value) continue;
+    const patterns = [
+      new RegExp(`\\{\\{${field}\\}\\}`, 'g'),
+      new RegExp(`\\$\\{${field}\\}`, 'g'),
+      new RegExp(`\\[${field}\\]`, 'g'),
+      new RegExp(`#${field}#`, 'g'),
+    ];
+    for (const p of patterns) result = result.replace(p, escapeXml(value));
+  }
+  return result;
 }
 
 function escapeXml(str) {
@@ -1442,16 +1359,8 @@ async function applyFormAndExport() {
 // =====================================================================
 function openBatchModal() {
   if (!docxZip) { showToast('请先加载模板 DOCX 文件', 'error'); return; }
-  detectFieldsFromTemplate();
-  batchCurrentStep=1;
-  batchMapping={};
-  batchResultLog=[];
-  batchRunning=false;
-  batchFilenameTemplate=document.getElementById('filenameTemplate')?.value||'文档_{{index}}';
-  document.getElementById('batchReadyMsg').textContent='请先上传 CSV/JSON 数据文件';
-  document.getElementById('batchProgressWrap').style.display='none';
   document.getElementById('batchModal').classList.add('visible');
-  renderBatchStep();
+  batchCurrentStep=1; renderBatchStep();
 }
 function closeBatchModal() { document.getElementById('batchModal').classList.remove('visible'); }
 
@@ -1463,24 +1372,20 @@ function renderBatchStep() {
   }
   document.getElementById('batchPrevBtn').style.display=batchCurrentStep>1?'inline-flex':'none';
   const nextBtn=document.getElementById('batchNextBtn');
-  if (batchCurrentStep===3) { nextBtn.textContent=batchRunning?'生成中...':'生成 ZIP 下载'; nextBtn.className='btn btn-green'; }
+  if (batchCurrentStep===3) { nextBtn.textContent='生成 ZIP 下载'; nextBtn.className='btn btn-green'; }
   else { nextBtn.textContent='下一步'; nextBtn.className='btn btn-green'; }
 }
 
 function batchStepNext() {
-  if (batchRunning) return;
   if (batchCurrentStep===1) {
     if (!batchData.rows.length) { showToast('请先上传数据', 'error'); return; }
     buildMappingUI();
     batchCurrentStep=2;
   } else if (batchCurrentStep===2) {
-    const mappings=getMappings();
-    if (!Object.keys(mappings).length) { showToast('请至少映射一个字段', 'error'); return; }
-    batchFilenameTemplate=document.getElementById('filenameTemplate')?.value||'文档_{{index}}';
     const rowCount=batchData.rows.length;
     document.getElementById('batchReadyMsg').innerHTML=
       `准备生成 <strong style="color:var(--accent-green);font-size:20px">${rowCount}</strong> 份文档<br>
-      <span style="font-size:12px;color:var(--text-muted);margin-top:6px;display:block">文件名模板: ${batchFilenameTemplate}</span>`;
+      <span style="font-size:12px;color:var(--text-muted);margin-top:6px;display:block">文件名模板: ${document.getElementById('filenameTemplate').value||'文档_{{index}}'}</span>`;
     document.getElementById('batchProgressWrap').style.display='none';
     batchCurrentStep=3;
   } else if (batchCurrentStep===3) {
@@ -1491,7 +1396,6 @@ function batchStepNext() {
 }
 
 function batchStepPrev() {
-  if (batchRunning) return;
   if (batchCurrentStep>1) { batchCurrentStep--; renderBatchStep(); }
 }
 
@@ -1520,63 +1424,46 @@ function getMappings() {
     const sel=document.getElementById(`mapping_${field.name}`);
     if(sel&&sel.value) m[field.name]=sel.value;
   });
-  batchMapping=m;
   return m;
 }
 
 async function generateBatchDocuments() {
   const mappings=getMappings();
-  if (!Object.keys(mappings).length) { showToast('请先完成字段映射', 'error'); return; }
   const filenameTpl=document.getElementById('filenameTemplate').value||'文档_{{index}}';
   const rows=batchData.rows;
   const nextBtn=document.getElementById('batchNextBtn');
   nextBtn.disabled=true; nextBtn.textContent='生成中...';
-  batchRunning=true;
   const progressWrap=document.getElementById('batchProgressWrap');
   const progressFill=document.getElementById('batchProgressFill');
   const progressText=document.getElementById('batchProgressText');
   progressWrap.style.display='block';
   const outZip=new JSZip();
   const baseXml=originalXml;
-  batchResultLog=[];
   for (let i=0;i<rows.length;i++) {
     const row=rows[i];
-    try {
-      // 使用增强版替换引擎（支持跨 w:t 节点）
-      const xml=applyMappingToXml(baseXml, mappings);
-      // Generate filename
-      let fname=filenameTpl.replace(/\{\{\s*index\s*\}\}/g,String(i+1));
-      fname=fname.replace(/\{\{\s*([^{}]+?)\s*\}\}/g,(_,key)=>{
-        const v=row[key]; return (v===undefined||v===null)?'':String(v);
-      });
-      fname=fname.replace(/[\\/:*?"<>|]/g,'_');
-      if(!fname.toLowerCase().endsWith('.docx')) fname+='.docx';
-      const docZip=await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
-      docZip.file('word/document.xml',xml);
-      const blob=await docZip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-      outZip.file(fname,blob);
-      batchResultLog.push({index:i+1,ok:true,filename:fname,message:'success'});
-    } catch(err) {
-      batchResultLog.push({index:i+1,ok:false,filename:'',message:err.message||'unknown'});
+    const values={};
+    for (const [field,col] of Object.entries(mappings)) {
+      values[field]=row[col]||'';
     }
+    let xml=applyFormValues(baseXml,values);
+    // Generate filename
+    let fname=filenameTpl.replace(/\{\{index\}\}/g,String(i+1));
+    for (const [k,v] of Object.entries(row)) { fname=fname.replace(new RegExp(`\\{\\{${k}\\}\\}`,'g'),v); }
+    fname=fname.replace(/[\\/:*?"<>|]/g,'_');
+    const docZip=await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
+    docZip.file('word/document.xml',xml);
+    const blob=await docZip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    outZip.file(`${fname}.docx`,blob);
     const pct=Math.round((i+1)/rows.length*100);
     progressFill.style.width=pct+'%';
     progressText.textContent=`${i+1} / ${rows.length}`;
     await new Promise(r=>setTimeout(r,0)); // yield to UI
   }
-  // 附带生成报告
-  const report=['index,status,filename,message']
-    .concat(batchResultLog.map(r=>
-      `${r.index},${r.ok?'OK':'FAIL'},"${(r.filename||'').replace(/"/g,'""')}","${(r.message||'').replace(/"/g,'""')}"`
-    )).join('\n');
-  outZip.file('report.csv',report);
-  const zipBlob=await outZip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
-  const baseName=(document.getElementById('fileName')?.textContent||'template').replace(/\.docx$/i,'');
+  const zipBlob=await outZip.generateAsync({type:'blob'});
+  const baseName=(document.getElementById('fileName').textContent||'template').replace(/\.docx$/i,'');
   saveAs(zipBlob,`${baseName}_批量_${rows.length}份.zip`);
-  const okCount=batchResultLog.filter(x=>x.ok).length;
-  showToast(`批量生成完成：成功 ${okCount}/${rows.length}`, okCount===rows.length?'success':'info');
+  showToast(`已生成 ${rows.length} 份文档并打包下载`, 'success');
   nextBtn.disabled=false; nextBtn.textContent='重新生成';
-  batchRunning=false;
 }
 
 // CSV / JSON 解析
@@ -1869,6 +1756,29 @@ document.addEventListener('DOMContentLoaded', () => {
   s.src='https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
   s.onerror=()=>console.warn('mammoth.js 加载失败，使用内置解析器');
   document.head.appendChild(s);
+});
+
+// =====================================================================
+// 桌面工具下载 Tooltip 控制
+// =====================================================================
+function toggleDownloadTooltip(e) {
+  e.stopPropagation();
+  const tooltip = document.getElementById('downloadTooltip');
+  if (tooltip.classList.contains('visible')) {
+    closeDownloadTooltip();
+  } else {
+    tooltip.classList.add('visible');
+  }
+}
+function closeDownloadTooltip() {
+  document.getElementById('downloadTooltip').classList.remove('visible');
+}
+// 点击页面其他区域关闭 tooltip
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('desktopToolWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    closeDownloadTooltip();
+  }
 });
 </script>
 </body>
