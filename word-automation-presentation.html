@@ -80,7 +80,7 @@ body {
   transform: translateX(60px);
   transition: all 0.6s cubic-bezier(0.4,0,0.2,1);
   pointer-events: none;
-  padding: 60px 80px;
+  padding: 50px 80px;
 }
 .slide.active {
   opacity: 1;
@@ -234,10 +234,12 @@ body {
 .slide-intro {
   background: var(--bg-white);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .intro-header {
   margin-bottom: 36px;
+  width: 100%;
+  text-align: left;
 }
 .intro-label {
   font-size: 12px;
@@ -297,7 +299,7 @@ body {
 .slide-problem {
   background: var(--bg-light);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .problem-grid {
   display: grid;
@@ -342,7 +344,7 @@ body {
 .slide-tech {
   background: var(--bg-white);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .tech-layout {
   display: flex;
@@ -427,7 +429,7 @@ body {
 .slide-modules {
   background: linear-gradient(135deg, #1A1F36, #2E3A59);
   color: #fff;
-  align-items: flex-start;
+  align-items: center;
 }
 .modules-grid {
   display: grid;
@@ -469,7 +471,7 @@ body {
 .slide-location {
   background: var(--bg-white);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .location-layout {
   display: flex;
@@ -541,7 +543,7 @@ body {
 .slide-modify {
   background: var(--bg-light);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .modify-layout {
   display: flex;
@@ -630,7 +632,7 @@ body {
 .slide-audit {
   background: var(--bg-white);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .audit-layout {
   display: flex;
@@ -725,7 +727,7 @@ body {
 .slide-case {
   background: linear-gradient(135deg, #1A1F36, #2E3A59);
   color: #fff;
-  align-items: flex-start;
+  align-items: center;
 }
 .case-grid {
   display: grid;
@@ -785,7 +787,7 @@ body {
 .slide-scenarios {
   background: var(--bg-light);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .scenarios-grid {
   display: grid;
@@ -827,7 +829,7 @@ body {
 .slide-summary {
   background: var(--bg-white);
   color: var(--text-dark);
-  align-items: flex-start;
+  align-items: center;
 }
 .summary-grid {
   display: grid;
@@ -1457,12 +1459,12 @@ body {
 
   </div>
 
-  <!-- Navigation -->
+  <!-- Navigation: arrows only, no dots -->
   <div class="nav-bar" id="navBar">
     <button class="nav-btn" id="prevBtn" onclick="prevSlide()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <div id="navDots"></div>
+    <div id="navDots" style="display:none;"></div>
     <button class="nav-btn" id="nextBtn" onclick="nextSlide()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
