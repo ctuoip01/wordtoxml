@@ -147,7 +147,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  z-index: 100;
+  z-index: 200;
 }
 .nav-dot {
   width: 8px; height: 8px;
@@ -163,21 +163,24 @@ body {
   background: var(--accent);
 }
 .nav-btn {
-  width: 36px; height: 36px;
+  width: 42px; height: 42px;
   border-radius: 50%;
   border: none;
-  background: rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.2);
   color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  backdrop-filter: blur(4px);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  position: relative;
 }
-.nav-btn.dark { background: rgba(0,0,0,0.06); color: #666; }
-.nav-btn:hover { background: rgba(255,255,255,0.3); transform: scale(1.1); }
-.nav-btn.dark:hover { background: rgba(0,0,0,0.1); }
+.nav-btn.dark { background: rgba(0,0,0,0.08); color: #555; }
+.nav-btn:hover { background: rgba(255,255,255,0.35); transform: scale(1.12); }
+.nav-btn.dark:hover { background: rgba(0,0,0,0.14); }
+.nav-btn svg { width: 18px; height: 18px; }
 
 /* ===== Bokeh Decoration ===== */
 .bokeh {
