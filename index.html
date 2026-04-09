@@ -6,6 +6,7 @@
 <title>OOXML Word 编辑器 Pro</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -619,10 +620,10 @@ body {
       <div id="batchStep1">
         <div class="data-drop-zone" id="dataDropZone" onclick="document.getElementById('csvInput').click()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p>拖拽或点击上传 CSV / JSON 数据文件</p>
-          <small>CSV 第一行为字段名；JSON 为对象数组 [{key:value,...}]</small>
+          <p>拖拽或点击上传 CSV / JSON / Excel 数据文件</p>
+          <small>CSV/Excel 第一行为字段名；JSON 为对象数组 [{key:value,...}]</small>
         </div>
-        <input type="file" id="csvInput" accept=".csv,.json,.txt" style="display:none">
+        <input type="file" id="csvInput" accept=".csv,.json,.txt,.xlsx,.xls" style="display:none">
         <div id="dataPreviewWrap" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:6px;">
             <span style="font-size:12px;color:var(--text-muted)">数据预览（前 5 行）</span>
@@ -644,12 +645,13 @@ body {
         <div class="field-mapping">
           <div class="form-section-title" style="margin-bottom:10px;">字段映射 — 模板字段 → 数据列</div>
           <div id="mappingRows"></div>
+          <div style="margin-top:10px;"><button class="btn" onclick="previewFirstRow()" style="font-size:11px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> 预览第一行</button></div>
         </div>
         <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border-color);">
           <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">输出文件名模板（可使用数据列名作为变量）：</div>
           <input type="text" id="filenameTemplate" placeholder="文档_{{name}}" value="文档_{{index}}"
             style="width:100%;padding:7px 10px;background:var(--bg-tertiary);border:1px solid var(--border-color);border-radius:5px;color:var(--text-primary);font-size:12px;outline:none;">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">可用变量：{{index}} 为行号（1起），以及所有数据列名</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">可用变量：{{index}} 或 {{row}} 为行号（1起），以及所有数据列名</div>
         </div>
       </div>
 
@@ -840,6 +842,7 @@ async function loadDocx(file) {
     const docXmlFile = docxZip.file('word/document.xml');
     if (!docXmlFile) throw new Error('无效的 DOCX：找不到 word/document.xml');
     originalXml = await docXmlFile.async('string');
+    originalXml = mergeAdjacentRuns(originalXml);
     let displayXml = originalXml;
     try {
       const parser = new DOMParser();
@@ -953,14 +956,85 @@ function buildParagraphMap() {
   });
 }
 
+
+// =====================================================================
+// 合并 Word 拆分的占位符 runs（处理 {{字段}} 被拆分到多个 <w:r> 的情况）
+// =====================================================================
+function mergeAdjacentRuns(xml) {
+  // Strategy: collapse adjacent <w:r>...<w:t>...</w:t>...</w:r> sequences
+  // where their combined <w:t> text forms a {{...}} / ${...} / [...] / #...# pattern.
+  // We work on the raw XML string using a state-machine approach.
+  // Match a run: captures optional rPr and the w:t text content
+  const runRe = /(<w:r(?:\s[^>]*)?>)((?:<w:rPr>[\s\S]*?<\/w:rPr>)?)\s*<w:t(?:[^>]*)>([\s\S]*?)<\/w:t>\s*<\/w:r>/g;
+
+  // We'll scan for sequences of runs whose concatenated text contains a split placeholder
+  // Simpler approach: repeatedly replace patterns where {{ or ${ or # or [ is split across runs
+  let prev;
+  let iterations = 0;
+  const DELIMITERS = [
+    // {{...}} split anywhere inside
+    { open: '{{', close: '}}' },
+    // ${...}
+    { open: '${', close: '}' },
+    // #...#
+    { open: '#', close: '#', singleChar: true },
+  ];
+
+  // Use a targeted regex to merge runs that together form {{...}}
+  // Pattern: find two or more adjacent <w:r> whose <w:t> text, when concatenated, matches a placeholder
+  // We'll do this by finding runs adjacent in the XML and checking concatenated text
+
+  function mergeRunPair(xml) {
+    // Match two adjacent runs (no non-run content between them except whitespace)
+    // Capture: full run1, rPr1, text1, full run2, rPr2, text2
+    const re = /(<w:r(?:\s[^>]*)?>)((?:<w:rPr>[\s\S]*?<\/w:rPr>)?)\s*<w:t(?:[^>]*)>([\s\S]*?)<\/w:t>\s*<\/w:r>\s*(<w:r(?:\s[^>]*)?>)((?:<w:rPr>[\s\S]*?<\/w:rPr>)?)\s*<w:t(?:[^>]*)>([\s\S]*?)<\/w:t>\s*<\/w:r>/g;
+    let changed = false;
+    const result = xml.replace(re, (match, open1, rpr1, t1, open2, rpr2, t2) => {
+      const combined = t1 + t2;
+      // Check if combining these two texts helps form or completes a placeholder
+      const needsMerge = (
+        (t1.includes('{') && !t1.includes('}}') && combined.includes('{{')) ||
+        (t1 === '{{' && !t2.startsWith('{')) ||
+        (t1 === '$' && t2.startsWith('{')) ||
+        (t1.endsWith('{') && combined.includes('{{')) ||
+        (t1.includes('{{') && !t1.includes('}}') && (t2.includes('}}') || !t2.includes('{{'))) ||
+        (t1.includes('${') && !t1.includes('}') && t2.includes('}')) ||
+        (t1 === '#' && !t2.includes('#')) ||
+        (!t1.includes('#') && t2 === '#') ||
+        // General: combined text closes a placeholder that t1 opened
+        (/\{\{[^\}]*$/.test(t1) && t2.includes('}}')) ||
+        (/\$\{[^\}]*$/.test(t1) && t2.includes('}')) ||
+        (t1.startsWith('#') && !t1.endsWith('#') && t2.endsWith('#'))
+      );
+      if (needsMerge) {
+        changed = true;
+        const hasSpace = combined.includes(' ') ? ' xml:space="preserve"' : '';
+        return `${open1}${rpr1}<w:t${hasSpace}>${combined}</w:t></w:r>`;
+      }
+      return match;
+    });
+    return { xml: result, changed };
+  }
+
+  // Run merge passes until stable (max 20 iterations)
+  do {
+    prev = xml;
+    const res = mergeRunPair(xml);
+    xml = res.xml;
+    iterations++;
+  } while (xml !== prev && iterations < 20);
+
+  return xml;
+}
+
 // =====================================================================
 // 模板字段检测
 // =====================================================================
 const FIELD_PATTERNS = [
-  /\{\{(\w+)\}\}/g,
-  /\$\{(\w+)\}/g,
-  /\[(\w[\w\s]*)\]/g,
-  /#(\w+)#/g,
+  /\{\{([^\s\{\}\$\[\]#]+)\}\}/g,
+  /\$\{([^\s\{\}\$\[\]#]+)\}/g,
+  /\[([^\s\[\]#\{\}][^\[\]#\{\}]*)\]/g,
+  /#([^\s\{\}\$\[\]#]+)#/g,
 ];
 
 function detectAndMarkFields() {
@@ -1309,14 +1383,16 @@ function getFormValues() {
 function applyFormValues(xml, values) {
   let result = xml;
   for (const [field, value] of Object.entries(values)) {
-    if (!value) continue;
+    if (!value && value !== 0) continue;
+    // Escape the field name for use in a RegExp (handles Chinese and special chars)
+    const escapedField = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const patterns = [
-      new RegExp(`\\{\\{${field}\\}\\}`, 'g'),
-      new RegExp(`\\$\\{${field}\\}`, 'g'),
-      new RegExp(`\\[${field}\\]`, 'g'),
-      new RegExp(`#${field}#`, 'g'),
+      new RegExp('\\{\\{' + escapedField + '\\}\\}', 'g'),
+      new RegExp('\\$\\{' + escapedField + '\\}', 'g'),
+      new RegExp('\\[' + escapedField + '\\]', 'g'),
+      new RegExp('#' + escapedField + '#', 'g'),
     ];
-    for (const p of patterns) result = result.replace(p, escapeXml(value));
+    for (const p of patterns) result = result.replace(p, escapeXml(String(value)));
   }
   return result;
 }
@@ -1427,6 +1503,28 @@ function getMappings() {
   return m;
 }
 
+
+async function previewFirstRow() {
+  if (!docxZip) { showToast('请先加载模板 DOCX 文件', 'error'); return; }
+  if (!batchData.rows.length) { showToast('请先上传数据', 'error'); return; }
+  const mappings = getMappings();
+  const row = batchData.rows[0];
+  const values = {};
+  for (const [field, col] of Object.entries(mappings)) {
+    values[field] = row[col] || '';
+  }
+  const newXml = applyFormValues(originalXml, values);
+  const tempZip = await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
+  tempZip.file('word/document.xml', newXml);
+  const savedZip = docxZip, savedXml = originalXml;
+  docxZip = tempZip; originalXml = newXml;
+  await renderPreview();
+  docxZip = savedZip; originalXml = savedXml;
+  // Close the batch modal temporarily to show preview
+  document.getElementById('batchModal').classList.remove('visible');
+  showToast('正在预览第一行数据（点击「批量生成」重新打开）', 'info');
+}
+
 async function generateBatchDocuments() {
   const mappings=getMappings();
   const filenameTpl=document.getElementById('filenameTemplate').value||'文档_{{index}}';
@@ -1447,8 +1545,11 @@ async function generateBatchDocuments() {
     }
     let xml=applyFormValues(baseXml,values);
     // Generate filename
-    let fname=filenameTpl.replace(/\{\{index\}\}/g,String(i+1));
-    for (const [k,v] of Object.entries(row)) { fname=fname.replace(new RegExp(`\\{\\{${k}\\}\\}`,'g'),v); }
+    let fname=filenameTpl.replace(/\{\{index\}\}/g,String(i+1)).replace(/\{\{row\}\}/g,String(i+1));
+    for (const [k,v] of Object.entries(row)) {
+      const ek=k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      fname=fname.replace(new RegExp('\\{\\{'+ek+'\\}\\}','g'),v);
+    }
     fname=fname.replace(/[\\/:*?"<>|]/g,'_');
     const docZip=await JSZip.loadAsync(await docxZip.generateAsync({type:'arraybuffer'}));
     docZip.file('word/document.xml',xml);
@@ -1468,6 +1569,8 @@ async function generateBatchDocuments() {
 
 // CSV / JSON 解析
 function parseCSV(text) {
+  // Strip UTF-8 BOM (Excel CSV export)
+  text = text.replace(/^\uFEFF/, '');
   const lines=text.trim().split('\n').filter(l=>l.trim());
   if(!lines.length) return {headers:[],rows:[]};
   function parseLine(line) {
@@ -1642,23 +1745,49 @@ function initDragDrop() {
 }
 
 function handleDataFile(file) {
-  const reader=new FileReader();
-  reader.onload=e=>{
-    try {
-      const text=e.target.result;
-      let data;
-      if(file.name.endsWith('.json')){
-        const arr=JSON.parse(text);
-        if(!Array.isArray(arr)||!arr.length) throw new Error('需要非空数组');
-        data={headers:Object.keys(arr[0]),rows:arr};
-      } else {
-        data=parseCSV(text);
-      }
-      if(!data.rows.length) throw new Error('数据为空');
-      loadDataIntoUI(data);
-    } catch(e) { showToast(`解析失败: ${e.message}`, 'error'); }
+  const name = file.name.toLowerCase();
+  // Handle Excel files via SheetJS
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    if (typeof XLSX === 'undefined') { showToast('SheetJS 未加载，无法解析 Excel', 'error'); return; }
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const arr = XLSX.utils.sheet_to_json(ws, {defval:''});
+        if (!arr.length) throw new Error('数据为空');
+        const headers = Object.keys(arr[0]);
+        loadDataIntoUI({headers, rows: arr});
+      } catch(err) { showToast(`解析失败: ${err.message}`, 'error'); }
+    };
+    reader.readAsArrayBuffer(file);
+    return;
+  }
+  // JSON / CSV — try UTF-8 first, fallback to GBK if replacement chars found
+  const tryLoad = (encoding) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        let text = e.target.result;
+        // If UTF-8 produced garbled replacement chars and we haven't tried GBK yet
+        if (encoding === 'UTF-8' && text.includes('\uFFFD')) {
+          tryLoad('GBK'); return;
+        }
+        let data;
+        if (name.endsWith('.json')) {
+          const arr = JSON.parse(text);
+          if (!Array.isArray(arr) || !arr.length) throw new Error('需要非空数组');
+          data = {headers: Object.keys(arr[0]), rows: arr};
+        } else {
+          data = parseCSV(text);
+        }
+        if (!data.rows.length) throw new Error('数据为空');
+        loadDataIntoUI(data);
+      } catch(err) { showToast(`解析失败: ${err.message}`, 'error'); }
+    };
+    reader.readAsText(file, encoding);
   };
-  reader.readAsText(file,'UTF-8');
+  tryLoad('UTF-8');
 }
 
 // =====================================================================
